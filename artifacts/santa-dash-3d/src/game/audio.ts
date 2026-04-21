@@ -43,6 +43,26 @@ let unlocked = false;
 let bgm: HTMLAudioElement | null = null;
 let bgmStarted = false;
 
+const BGM_BASE_VOLUME = 0.35;
+const BGM_DUCK_VOLUME = 0.1;
+const BGM_DUCK_MS = 550;
+// SFX that should briefly duck the music while they play.
+const DUCK_KEYS = new Set(["chim", "ice", "end", "trip", "powerup"]);
+let duckTimer: ReturnType<typeof setTimeout> | null = null;
+let duckUntil = 0;
+
+function duckMusic(ms: number) {
+  if (!bgm || musicMuted) return;
+  bgm.volume = BGM_DUCK_VOLUME;
+  duckUntil = Math.max(duckUntil, performance.now() + ms);
+  if (duckTimer) clearTimeout(duckTimer);
+  const remaining = duckUntil - performance.now();
+  duckTimer = setTimeout(() => {
+    duckTimer = null;
+    if (bgm && !musicMuted) bgm.volume = BGM_BASE_VOLUME;
+  }, remaining);
+}
+
 export function preloadAudio() {
   for (const [key, urls] of Object.entries(pools)) {
     elements[key] = urls.map((url) => {
@@ -56,7 +76,7 @@ export function preloadAudio() {
   if (!bgm) {
     bgm = new Audio(`${BASE}/SilentNight.mp3`);
     bgm.loop = true;
-    bgm.volume = 0.35;
+    bgm.volume = BGM_BASE_VOLUME;
     bgm.preload = "auto";
   }
 }
@@ -101,6 +121,7 @@ export function playSound(key: keyof typeof pools) {
   const node = original.cloneNode(true) as HTMLAudioElement;
   node.volume = original.volume;
   node.play().catch(() => {});
+  if (DUCK_KEYS.has(key as string)) duckMusic(BGM_DUCK_MS);
 }
 
 export function setSfxMuted(m: boolean) { sfxMuted = m; }
@@ -113,6 +134,7 @@ export function setMusicMuted(m: boolean) {
     bgm.pause();
     bgmStarted = false;
   } else if (unlocked) {
+    bgm.volume = BGM_BASE_VOLUME;
     startMusic();
   }
 }
