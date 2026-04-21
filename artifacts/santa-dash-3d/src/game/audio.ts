@@ -23,7 +23,10 @@ const pools: Record<string, string[]> = {
     ...range(1, 9).map((i) => `${BASE}/santaice${i}.mp3`),
     ...range(1, 10).map((i) => `${BASE}/slip${i}.mp3`),
   ],
-  end: range(1, 49).map((i) => `${BASE}/endgame${i}.mp3`),
+  end: [
+    ...range(1, 49).map((i) => `${BASE}/endgame${i}.mp3`),
+    `${BASE}/endgame50d.mp3`,
+  ],
 };
 
 const elements: Record<string, HTMLAudioElement[]> = {};

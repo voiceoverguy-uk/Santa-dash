@@ -138,12 +138,11 @@ export class World {
     // Speed up gradually
     this.speed = Math.min(this.maxSpeed, 9 + this.santaX * 0.005);
 
-    // Forward motion
-    if (!this.isFalling) {
-      this.santaX += this.speed * dt;
-    } else {
-      this.santaX += this.speed * 0.25 * dt;
-    }
+    // Forward motion — slips briefly slow Santa, falls drift slowly
+    let forwardScale = 1;
+    if (this.isFalling) forwardScale = 0.25;
+    else if (this.slipTimer > 0) forwardScale = 0.5;
+    this.santaX += this.speed * forwardScale * dt;
 
     // Run animation advance
     const animFps = 26 + (this.speed - 9) * 1.5;
