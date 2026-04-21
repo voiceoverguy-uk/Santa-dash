@@ -83,14 +83,23 @@ function duckMusic(ms: number) {
   }, remaining);
 }
 
+// Pre-allocated copies per pool entry so we never need to cloneNode() at
+// playtime — iOS Safari blocks .play() on Audio elements that weren't
+// "warmed" inside a user gesture, so we warm everything up front.
+const COPIES_PER_VARIANT = 2;
+
 export function preloadAudio() {
   for (const [key, urls] of Object.entries(pools)) {
-    elements[key] = urls.map((url) => {
-      const a = new Audio(url);
-      a.preload = "auto";
-      a.volume = 0.7;
-      return a;
-    });
+    const list: HTMLAudioElement[] = [];
+    for (const url of urls) {
+      for (let c = 0; c < COPIES_PER_VARIANT; c++) {
+        const a = new Audio(url);
+        a.preload = "auto";
+        a.volume = 0.7;
+        list.push(a);
+      }
+    }
+    elements[key] = list;
     lastIndex[key] = -1;
   }
   if (!bgm) {
@@ -106,18 +115,38 @@ export function unlockAudio() {
   if (Object.keys(elements).length === 0) preloadAudio();
   if (Object.keys(elements).length === 0) return;
   unlocked = true;
-  // Touch each pool with a silent play to unlock on iOS/Safari
+  // iOS Safari requires every Audio element to be touched inside a user
+  // gesture before it can be played later. Walk every preloaded element,
+  // start it muted, then immediately pause/reset.
   for (const els of Object.values(elements)) {
-    const a = els[0];
-    if (!a) continue;
-    a.muted = true;
-    a.play().then(() => {
-      a.pause();
-      a.currentTime = 0;
-      a.muted = false;
-    }).catch(() => {});
+    for (const a of els) {
+      try {
+        a.muted = true;
+        const p = a.play();
+        if (p && typeof p.then === "function") {
+          p.then(() => {
+            a.pause();
+            a.currentTime = 0;
+            a.muted = false;
+          }).catch(() => {
+            a.muted = false;
+          });
+        }
+      } catch {
+        /* ignore */
+      }
+    }
   }
-  // Also start music if not muted
+  // Also touch + start music synchronously inside the gesture.
+  if (bgm) {
+    try {
+      bgm.muted = false;
+      // Force the load now that we have a gesture
+      bgm.load();
+    } catch {
+      /* ignore */
+    }
+  }
   startMusic();
 }
 
@@ -136,10 +165,13 @@ export function playSound(key: keyof typeof pools) {
     idx = (idx + 1) % els.length;
   }
   lastIndex[key] = idx;
-  const original = els[idx];
-  // Clone to allow overlapping playback
-  const node = original.cloneNode(true) as HTMLAudioElement;
-  node.volume = original.volume;
+  const node = els[idx];
+  try {
+    node.currentTime = 0;
+  } catch {
+    /* ignore — element may not be ready, .play() still resets */
+  }
+  node.muted = false;
   node.play().catch(() => {});
   if (DUCK_KEYS.has(key as string)) duckMusic(BGM_DUCK_MS);
 }

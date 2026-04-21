@@ -104,26 +104,63 @@ export function Background({ world }: Props) {
         <meshBasicMaterial color="#ffd97a" transparent opacity={0.22} toneMapped={false} />
       </mesh>
 
-      {/* Far snowy mountain backdrop — big, soft, tiles smoothly */}
-      <mesh ref={farRef} position={[0, 7, -45]}>
-        <planeGeometry args={[140, 22]} />
-        <meshBasicMaterial
-          map={farTex}
-          toneMapped={false}
+      {/* Far snowy mountain backdrop — big, soft, tiles smoothly. Custom shader
+          so the top edge fades out into the sky and there's no visible seam. */}
+      <mesh ref={farRef} position={[0, 6, -45]}>
+        <planeGeometry args={[160, 26]} />
+        <shaderMaterial
+          attach="material"
           transparent
-          opacity={0.92}
+          args={[{
+            uniforms: { map: { value: farTex } },
+            vertexShader: `
+              varying vec2 vUv;
+              void main() {
+                vUv = uv;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+              }
+            `,
+            fragmentShader: `
+              uniform sampler2D map;
+              varying vec2 vUv;
+              void main() {
+                vec4 tex = texture2D(map, vUv);
+                // Fade out the top 35% so the plane edge disappears into the sky
+                float topFade = smoothstep(1.0, 0.65, vUv.y);
+                gl_FragColor = vec4(tex.rgb, tex.a * topFade);
+              }
+            `,
+          }]}
         />
       </mesh>
 
       {/* Mid silhouette — same image, tighter tile & a bit darker */}
       <mesh ref={midRef} position={[0, 3.5, -22]}>
         <planeGeometry args={[100, 14]} />
-        <meshBasicMaterial
-          map={midTex}
-          toneMapped={false}
+        <shaderMaterial
+          attach="material"
           transparent
-          opacity={0.55}
-          color="#5a6a90"
+          args={[{
+            uniforms: { map: { value: midTex }, tint: { value: new THREE.Color("#5a6a90") } },
+            vertexShader: `
+              varying vec2 vUv;
+              void main() {
+                vUv = uv;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+              }
+            `,
+            fragmentShader: `
+              uniform sampler2D map;
+              uniform vec3 tint;
+              varying vec2 vUv;
+              void main() {
+                vec4 tex = texture2D(map, vUv);
+                float topFade = smoothstep(1.0, 0.55, vUv.y);
+                vec3 col = mix(tex.rgb, tex.rgb * tint, 0.55);
+                gl_FragColor = vec4(col, tex.a * 0.7 * topFade);
+              }
+            `,
+          }]}
         />
       </mesh>
     </>
