@@ -27,6 +27,11 @@ const pools: Record<string, string[]> = {
     ...range(1, 49).map((i) => `${BASE}/endgame${i}.mp3`),
     `${BASE}/endgame50d.mp3`,
   ],
+  // Power-up & combo cues — reuse the cheery "ready" jingles and "santajump"
+  // bursts since no dedicated cues ship with the project. Different keys keep
+  // the rotation independent so they don't fight the main pools.
+  powerup: range(1, 11).map((i) => `${BASE}/ready${i}.mp3`),
+  combo: range(1, 6).map((i) => `${BASE}/santajump${i}.mp3`),
 };
 
 const elements: Record<string, HTMLAudioElement[]> = {};

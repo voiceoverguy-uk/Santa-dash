@@ -2,7 +2,7 @@ import { useMemo, useRef } from "react";
 import { useFrame, useLoader } from "@react-three/fiber";
 import * as THREE from "three";
 import { OBSTACLES, ROOFTOPS } from "./assets";
-import type { World, Platform, Obstacle, Collectible } from "./world";
+import type { World, Platform, Obstacle, Collectible, PowerUp, PowerUpKind } from "./world";
 import { SNOW_CAP_HEIGHT } from "./world";
 
 interface Props {
@@ -11,12 +11,77 @@ interface Props {
 
 const PLATFORM_HEIGHT = 4.4;
 
+// ---- Procedural power-up textures ----
+function makePowerUpTexture(
+  emoji: string,
+  bg: string,
+  glow: string,
+): THREE.Texture {
+  const size = 256;
+  const c = document.createElement("canvas");
+  c.width = c.height = size;
+  const ctx = c.getContext("2d")!;
+  // Outer glow
+  const grad = ctx.createRadialGradient(size / 2, size / 2, size * 0.18, size / 2, size / 2, size * 0.5);
+  grad.addColorStop(0, glow);
+  grad.addColorStop(0.55, glow.replace(/[\d.]+\)$/, "0.35)"));
+  grad.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, size, size);
+  // Disc
+  ctx.beginPath();
+  ctx.arc(size / 2, size / 2, size * 0.32, 0, Math.PI * 2);
+  const disc = ctx.createRadialGradient(size / 2, size * 0.42, 4, size / 2, size / 2, size * 0.32);
+  disc.addColorStop(0, "#ffffff");
+  disc.addColorStop(0.4, bg);
+  disc.addColorStop(1, shade(bg, -0.35));
+  ctx.fillStyle = disc;
+  ctx.fill();
+  ctx.lineWidth = 6;
+  ctx.strokeStyle = "rgba(255,255,255,0.85)";
+  ctx.stroke();
+  // Glyph
+  ctx.font = `${Math.floor(size * 0.45)}px 'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(emoji, size / 2, size / 2 + 6);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  return tex;
+}
+
+function shade(hex: string, amt: number): string {
+  // hex like #rrggbb
+  const m = hex.match(/^#?([a-f0-9]{2})([a-f0-9]{2})([a-f0-9]{2})$/i);
+  if (!m) return hex;
+  const adjust = (h: string) => {
+    const v = Math.max(0, Math.min(255, Math.round(parseInt(h, 16) * (1 + amt))));
+    return v.toString(16).padStart(2, "0");
+  };
+  return `#${adjust(m[1])}${adjust(m[2])}${adjust(m[3])}`;
+}
+
+const POWERUP_STYLE: Record<PowerUpKind, { emoji: string; bg: string; glow: string }> = {
+  magnet: { emoji: "🧲", bg: "#d83b3b", glow: "rgba(255,80,80,0.9)" },
+  shield: { emoji: "🛡️", bg: "#3a8de8", glow: "rgba(120,200,255,0.9)" },
+  double: { emoji: "✨", bg: "#f2b62a", glow: "rgba(255,225,120,0.95)" },
+};
+
 export function WorldRender({ world }: Props) {
   const roofTextures = useLoader(THREE.TextureLoader, ROOFTOPS);
   const chimneyTex = useLoader(THREE.TextureLoader, OBSTACLES.chimney);
   const snowmanTex = useLoader(THREE.TextureLoader, OBSTACLES.snowman);
   const iceTex = useLoader(THREE.TextureLoader, OBSTACLES.ice);
   const mincePieTex = useLoader(THREE.TextureLoader, OBSTACLES.mincepie);
+
+  const powerUpTextures = useMemo(() => {
+    return {
+      magnet: makePowerUpTexture(POWERUP_STYLE.magnet.emoji, POWERUP_STYLE.magnet.bg, POWERUP_STYLE.magnet.glow),
+      shield: makePowerUpTexture(POWERUP_STYLE.shield.emoji, POWERUP_STYLE.shield.bg, POWERUP_STYLE.shield.glow),
+      double: makePowerUpTexture(POWERUP_STYLE.double.emoji, POWERUP_STYLE.double.bg, POWERUP_STYLE.double.glow),
+    } as Record<PowerUpKind, THREE.Texture>;
+  }, []);
 
   useMemo(() => {
     const all = [...roofTextures, chimneyTex, snowmanTex, iceTex, mincePieTex];
@@ -35,10 +100,17 @@ export function WorldRender({ world }: Props) {
   const platformGroupRef = useRef<THREE.Group>(null);
   const obstacleGroupRef = useRef<THREE.Group>(null);
   const collectibleGroupRef = useRef<THREE.Group>(null);
+  const powerUpGroupRef = useRef<THREE.Group>(null);
+  const auraRef = useRef<THREE.Group>(null);
 
   const platformMap = useRef(new Map<number, THREE.Group>());
   const obstacleMap = useRef(new Map<number, THREE.Mesh>());
   const collectibleMap = useRef(new Map<number, THREE.Mesh>());
+  const powerUpMap = useRef(new Map<number, THREE.Mesh>());
+
+  // Aura meshes
+  const shieldAuraRef = useRef<THREE.Mesh | null>(null);
+  const magnetAuraRef = useRef<THREE.Mesh | null>(null);
 
   useFrame(() => {
     const w = world.current;
@@ -55,6 +127,13 @@ export function WorldRender({ world }: Props) {
       collectibleMap.current,
       mincePieTex,
     );
+    syncPowerUps(
+      w.powerUps,
+      powerUpGroupRef.current!,
+      powerUpMap.current,
+      powerUpTextures,
+    );
+    syncAuras(w, auraRef.current!, shieldAuraRef, magnetAuraRef);
   });
 
   return (
@@ -62,6 +141,8 @@ export function WorldRender({ world }: Props) {
       <group ref={platformGroupRef} />
       <group ref={obstacleGroupRef} />
       <group ref={collectibleGroupRef} />
+      <group ref={powerUpGroupRef} />
+      <group ref={auraRef} />
     </>
   );
 }
@@ -252,3 +333,99 @@ function syncCollectibles(
   }
 }
 
+function syncPowerUps(
+  powerUps: PowerUp[],
+  group: THREE.Group,
+  map: Map<number, THREE.Mesh>,
+  textures: Record<PowerUpKind, THREE.Texture>,
+) {
+  const seen = new Set<number>();
+  for (const p of powerUps) {
+    seen.add(p.id);
+    let m = map.get(p.id);
+    if (!m) {
+      m = new THREE.Mesh(
+        new THREE.PlaneGeometry(1.6, 1.6),
+        new THREE.MeshBasicMaterial({
+          map: textures[p.kind],
+          transparent: true,
+          alphaTest: 0.02,
+          side: THREE.DoubleSide,
+          toneMapped: false,
+          depthWrite: false,
+        }),
+      );
+      map.set(p.id, m);
+      group.add(m);
+    }
+    const t = performance.now() * 0.003;
+    const bob = Math.sin(t + p.id) * 0.18;
+    const pulse = 1 + Math.sin(t * 2 + p.id) * 0.06;
+    m.position.x = p.x;
+    m.position.y = p.y + bob;
+    m.position.z = 0.55;
+    m.scale.setScalar(pulse);
+    m.rotation.z = Math.sin(t * 0.6 + p.id) * 0.12;
+    m.visible = !p.collected;
+  }
+  for (const [id, mesh] of map) {
+    if (!seen.has(id)) {
+      group.remove(mesh);
+      mesh.geometry.dispose();
+      (mesh.material as THREE.Material).dispose();
+      map.delete(id);
+    }
+  }
+}
+
+function syncAuras(
+  w: World,
+  group: THREE.Group,
+  shieldRef: React.MutableRefObject<THREE.Mesh | null>,
+  magnetRef: React.MutableRefObject<THREE.Mesh | null>,
+) {
+  // Shield bubble around santa
+  if (!shieldRef.current) {
+    const m = new THREE.Mesh(
+      new THREE.RingGeometry(0.95, 1.25, 32),
+      new THREE.MeshBasicMaterial({
+        color: 0x7dd3fc,
+        transparent: true,
+        opacity: 0.55,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        toneMapped: false,
+      }),
+    );
+    shieldRef.current = m;
+    group.add(m);
+  }
+  if (!magnetRef.current) {
+    const m = new THREE.Mesh(
+      new THREE.RingGeometry(2.4, 2.65, 48),
+      new THREE.MeshBasicMaterial({
+        color: 0xff7a7a,
+        transparent: true,
+        opacity: 0.35,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        toneMapped: false,
+      }),
+    );
+    magnetRef.current = m;
+    group.add(m);
+  }
+  const t = performance.now() * 0.004;
+  const sh = shieldRef.current!;
+  const ma = magnetRef.current!;
+  sh.visible = w.powerUpTimers.shield > 0;
+  ma.visible = w.powerUpTimers.magnet > 0;
+  sh.position.set(w.santaX, w.santaY, 0.6);
+  sh.scale.setScalar(1 + Math.sin(t * 2) * 0.06);
+  (sh.material as THREE.MeshBasicMaterial).opacity =
+    0.45 + Math.sin(t * 3) * 0.18;
+  ma.position.set(w.santaX, w.santaY, 0.55);
+  ma.rotation.z = t * 0.6;
+  (ma.material as THREE.MeshBasicMaterial).opacity =
+    0.25 + Math.sin(t * 2.5) * 0.15;
+}

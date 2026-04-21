@@ -2,6 +2,7 @@
 
 export type ObstacleKind = "chimney" | "snowman" | "ice";
 export type CollectibleKind = "mincepie";
+export type PowerUpKind = "magnet" | "shield" | "double";
 
 export interface Obstacle {
   id: number;
@@ -16,6 +17,15 @@ export interface Obstacle {
 export interface Collectible {
   id: number;
   kind: CollectibleKind;
+  x: number;
+  y: number;
+  collected: boolean;
+  missed: boolean;
+}
+
+export interface PowerUp {
+  id: number;
+  kind: PowerUpKind;
   x: number;
   y: number;
   collected: boolean;
@@ -48,10 +58,29 @@ const JUMP_HOLD_FORCE = 38;            // additional upward accel while holding
 const JUMP_HOLD_MAX_DURATION = 0.28;   // seconds of extra force on hold
 const JUMP_RELEASE_VY_CUT = 0.45;      // velocity multiplier when jump is released early
 
+export const POWERUP_DURATION: Record<PowerUpKind, number> = {
+  magnet: 7,
+  shield: 9,
+  double: 7,
+};
+
+export interface TickEvents {
+  collected: number;          // raw count of presents collected this tick
+  scoreGained: number;        // total score gained this tick (incl. multiplier + double)
+  combo: number;              // current combo after this tick
+  multiplier: number;         // current scoring multiplier
+  hit: ObstacleKind | null;   // obstacle hit (life lost)
+  shieldedHit: ObstacleKind | null; // obstacle hit but shield absorbed
+  fellOff: boolean;
+  pickedPowerUp: PowerUpKind | null;
+  comboBroken: boolean;
+}
+
 export class World {
   platforms: Platform[] = [];
   obstacles: Obstacle[] = [];
   collectibles: Collectible[] = [];
+  powerUps: PowerUp[] = [];
   // Santa state
   santaX = 0;
   santaY = santaRestY(PLATFORM_TOP);
@@ -73,6 +102,10 @@ export class World {
   jumpHoldTime = 0;
   // Slip from ice
   slipTimer = 0;
+  // Combo + power-ups
+  combo = 0;
+  powerUpTimers: Record<PowerUpKind, number> = { magnet: 0, shield: 0, double: 0 };
+  spawnedPowerUpAt = -Infinity; // x of last power-up spawn (for spacing)
 
   constructor() { this.reset(); }
 
@@ -80,6 +113,7 @@ export class World {
     this.platforms = [];
     this.obstacles = [];
     this.collectibles = [];
+    this.powerUps = [];
     this.santaX = 0;
     this.santaY = santaRestY(PLATFORM_TOP);
     this.santaVY = 0;
@@ -94,6 +128,9 @@ export class World {
     this.jumpHeld = false;
     this.jumpHoldTime = 0;
     this.slipTimer = 0;
+    this.combo = 0;
+    this.powerUpTimers = { magnet: 0, shield: 0, double: 0 };
+    this.spawnedPowerUpAt = -Infinity;
     // Initial long safe runway
     const start: Platform = {
       id: newId(),
@@ -126,14 +163,27 @@ export class World {
     this.jumpHeld = false;
   }
 
-  tick(dt: number): {
-    collected: number;
-    hit: ObstacleKind | null;
-    fellOff: boolean;
-  } {
+  multiplier(): number {
+    const base = 1 + Math.floor(this.combo / 5);
+    return Math.min(5, base);
+  }
+
+  // returns events that happened this tick
+  tick(dt: number): TickEvents {
     let collected = 0;
+    let scoreGained = 0;
     let hit: ObstacleKind | null = null;
+    let shieldedHit: ObstacleKind | null = null;
     let fellOff = false;
+    let pickedPowerUp: PowerUpKind | null = null;
+    let comboBroken = false;
+
+    // Decay power-up timers
+    for (const k of ["magnet", "shield", "double"] as PowerUpKind[]) {
+      if (this.powerUpTimers[k] > 0) {
+        this.powerUpTimers[k] = Math.max(0, this.powerUpTimers[k] - dt);
+      }
+    }
 
     // Speed up gradually
     this.speed = Math.min(this.maxSpeed, 9 + this.santaX * 0.005);
@@ -180,6 +230,7 @@ export class World {
       if (!this.isFalling && this.santaY < SANTA_HALF_HEIGHT + SNOW_CAP_HEIGHT - 0.1) {
         this.isFalling = true;
         fellOff = true;
+        if (this.combo > 0) { this.combo = 0; comboBroken = true; }
       }
     }
 
@@ -190,7 +241,7 @@ export class World {
     if (this.slipTimer > 0) this.slipTimer -= dt;
     if (this.isFalling) this.fallTimer += dt;
 
-    // Collisions
+    // Collisions — only if not invulnerable and not falling
     if (this.hitTimer <= 0 && !this.isFalling) {
       const sxL = this.santaX - SANTA_HALF_WIDTH;
       const sxR = this.santaX + SANTA_HALF_WIDTH;
@@ -204,23 +255,68 @@ export class World {
         const oyT = o.y + o.h;
         if (sxR > oxL && sxL < oxR && syT > oyB && syB < oyT) {
           o.hit = true;
-          hit = o.kind;
-          this.hitTimer = 0.9;
-          this.hitKind = o.kind === "ice" ? "ice" : "chim";
-          if (o.kind === "ice") this.slipTimer = 0.5;
+          if (this.powerUpTimers.shield > 0) {
+            // Shield absorbs the hit — no life loss, no slip, no combo break
+            this.powerUpTimers.shield = 0;
+            shieldedHit = o.kind;
+            this.hitTimer = 0.4; // brief invuln so we don't immediately re-hit
+          } else {
+            hit = o.kind;
+            this.hitTimer = 0.9;
+            this.hitKind = o.kind === "ice" ? "ice" : "chim";
+            if (o.kind === "ice") this.slipTimer = 0.5;
+            if (this.combo > 0) { this.combo = 0; comboBroken = true; }
+          }
           break;
+        }
+      }
+    }
+
+    // Magnet effect — pull uncollected mince pies toward santa
+    if (this.powerUpTimers.magnet > 0) {
+      const radius = 5.5;
+      const pullSpeed = 14; // units / sec
+      for (const c of this.collectibles) {
+        if (c.collected || c.missed) continue;
+        const dx = this.santaX - c.x;
+        const dy = this.santaY - c.y;
+        const d = Math.hypot(dx, dy);
+        if (d < radius && d > 0.001) {
+          c.x += (dx / d) * pullSpeed * dt;
+          c.y += (dy / d) * pullSpeed * dt;
         }
       }
     }
 
     // Collectibles
     for (const c of this.collectibles) {
-      if (c.collected) continue;
+      if (c.collected || c.missed) continue;
       const dx = c.x - this.santaX;
       const dy = c.y - this.santaY;
       if (Math.abs(dx) < 0.85 && Math.abs(dy) < 1.0) {
         c.collected = true;
         collected += 1;
+        this.combo += 1;
+        const base = 10 * (this.powerUpTimers.double > 0 ? 2 : 1);
+        scoreGained += base * this.multiplier();
+      } else if (c.x < this.santaX - 1.2) {
+        // Passed by uncollected — break combo
+        c.missed = true;
+        if (this.combo > 0) { this.combo = 0; comboBroken = true; }
+      }
+    }
+
+    // Power-up pickups
+    for (const p of this.powerUps) {
+      if (p.collected) continue;
+      const dx = p.x - this.santaX;
+      const dy = p.y - this.santaY;
+      if (Math.abs(dx) < 1.0 && Math.abs(dy) < 1.1) {
+        p.collected = true;
+        pickedPowerUp = p.kind;
+        // (Re)start the timer for that power-up
+        this.powerUpTimers[p.kind] = POWERUP_DURATION[p.kind];
+        break;
       }
     }
 
@@ -229,11 +325,22 @@ export class World {
     this.platforms = this.platforms.filter((p) => p.x + p.width > cullBefore);
     this.obstacles = this.obstacles.filter((o) => o.x > cullBefore);
     this.collectibles = this.collectibles.filter((c) => c.x > cullBefore);
+    this.powerUps = this.powerUps.filter((p) => p.x > cullBefore);
 
     // Spawn ahead
     while (this.spawnedTo < this.santaX + 60) this.spawnChunk();
 
-    return { collected, hit, fellOff };
+    return {
+      collected,
+      scoreGained,
+      combo: this.combo,
+      multiplier: this.multiplier(),
+      hit,
+      shieldedHit,
+      fellOff,
+      pickedPowerUp,
+      comboBroken,
+    };
   }
 
   private spawnChunk() {
@@ -295,7 +402,28 @@ export class World {
         x: cx,
         y: cy,
         collected: false,
+        missed: false,
       });
+    }
+
+    // Occasionally spawn a power-up — rare, with min spacing
+    if (
+      Math.random() < 0.25 &&
+      platform.x - this.spawnedPowerUpAt > 22 &&
+      width > 6
+    ) {
+      const kinds: PowerUpKind[] = ["magnet", "shield", "double"];
+      const kind = kinds[Math.floor(Math.random() * kinds.length)];
+      const px = platform.x + width / 2 + (Math.random() - 0.5) * (width - 4);
+      const py = surfaceY + SANTA_HALF_HEIGHT + 1.6 + Math.random() * 0.8;
+      this.powerUps.push({
+        id: newId(),
+        kind,
+        x: px,
+        y: py,
+        collected: false,
+      });
+      this.spawnedPowerUpAt = platform.x;
     }
   }
 }

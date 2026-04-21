@@ -135,7 +135,22 @@ function Loop({ world }: { world: React.MutableRefObject<World> }) {
     const dt = Math.min(dtRaw, 1 / 30);
     const w = world.current;
     const ev = w.tick(dt);
-    if (ev.collected > 0) store.addScore(ev.collected * 10);
+    if (ev.scoreGained > 0) {
+      store.addScore(ev.scoreGained);
+      if (ev.combo > 0 && ev.combo % 5 === 0) playSound("combo");
+    }
+    store.setCombo(ev.combo, ev.multiplier);
+    store.setPowerUpTimers(w.powerUpTimers);
+    if (ev.pickedPowerUp) {
+      store.registerPowerUpPickup(ev.pickedPowerUp);
+      playSound("powerup");
+    }
+    if (ev.shieldedHit) {
+      // Shield absorbed — same audio cue as obstacle but no life lost
+      if (ev.shieldedHit === "ice") playSound("ice");
+      else playSound("chim");
+      store.set({ hitFlash: performance.now() });
+    }
     if (ev.hit) {
       if (ev.hit === "ice") playSound("ice");
       else playSound("chim");

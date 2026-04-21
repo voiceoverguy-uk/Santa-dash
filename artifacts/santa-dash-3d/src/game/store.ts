@@ -1,6 +1,14 @@
 import { useEffect, useState } from "react";
+import type { PowerUpKind } from "./world";
+import { POWERUP_DURATION } from "./world";
 
 export type GameStatus = "menu" | "ready" | "playing" | "dead";
+
+export interface PowerUpState {
+  kind: PowerUpKind;
+  remaining: number; // seconds
+  duration: number;  // seconds (full)
+}
 
 interface State {
   status: GameStatus;
@@ -9,6 +17,11 @@ interface State {
   lives: number;
   distance: number;
   hitFlash: number;
+  combo: number;
+  multiplier: number;
+  bestCombo: number;
+  powerUps: Partial<Record<PowerUpKind, PowerUpState>>;
+  pickupFlash: { kind: PowerUpKind; at: number } | null;
 }
 
 type Listener = (s: State) => void;
@@ -20,6 +33,11 @@ const initial: State = {
   lives: 3,
   distance: 0,
   hitFlash: 0,
+  combo: 0,
+  multiplier: 1,
+  bestCombo: 0,
+  powerUps: {},
+  pickupFlash: null,
 };
 
 let state: State = { ...initial };
@@ -40,11 +58,63 @@ export const store = {
     return () => listeners.delete(l);
   },
   reset: () => {
-    state = { ...state, status: "ready", score: 0, lives: 3, distance: 0, hitFlash: 0 };
+    state = {
+      ...state,
+      status: "ready",
+      score: 0,
+      lives: 3,
+      distance: 0,
+      hitFlash: 0,
+      combo: 0,
+      multiplier: 1,
+      bestCombo: 0,
+      powerUps: {},
+      pickupFlash: null,
+    };
     emit();
   },
   addScore: (n: number) => {
     state = { ...state, score: state.score + n };
+    emit();
+  },
+  setCombo: (combo: number, multiplier: number) => {
+    if (combo === state.combo && multiplier === state.multiplier) return;
+    const bestCombo = Math.max(state.bestCombo, combo);
+    state = { ...state, combo, multiplier, bestCombo };
+    emit();
+  },
+  setPowerUpTimers: (timers: Record<PowerUpKind, number>) => {
+    let changed = false;
+    const next: Partial<Record<PowerUpKind, PowerUpState>> = {};
+    for (const k of ["magnet", "shield", "double"] as PowerUpKind[]) {
+      const remaining = timers[k];
+      if (remaining > 0) {
+        const prev = state.powerUps[k];
+        next[k] = {
+          kind: k,
+          remaining,
+          duration: prev?.duration ?? POWERUP_DURATION[k],
+        };
+        if (!prev || Math.abs(prev.remaining - remaining) > 0.1) changed = true;
+      } else if (state.powerUps[k]) {
+        changed = true;
+      }
+    }
+    if (changed) {
+      state = { ...state, powerUps: next };
+      emit();
+    }
+  },
+  registerPowerUpPickup: (kind: PowerUpKind) => {
+    const duration = POWERUP_DURATION[kind];
+    state = {
+      ...state,
+      powerUps: {
+        ...state.powerUps,
+        [kind]: { kind, remaining: duration, duration },
+      },
+      pickupFlash: { kind, at: performance.now() },
+    };
     emit();
   },
   loseLife: () => {
