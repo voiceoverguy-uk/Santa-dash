@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Santa Dash 3D"
+version = "1.0.0"
+id = "artifacts/santa-dash-3d"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 19505
+
+[services.development]
+run = "pnpm --filter @workspace/santa-dash-3d run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/santa-dash-3d", "run", "build" ]
+publicDir = "artifacts/santa-dash-3d/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19505"
+BASE_PATH = "/"

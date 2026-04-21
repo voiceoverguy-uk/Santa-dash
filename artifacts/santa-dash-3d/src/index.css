@@ -1,0 +1,264 @@
+@import "tailwindcss";
+
+:root {
+  --bg-deep: #0a1628;
+  --bg-mid: #1a3a5c;
+  --bg-warm: #fef3d4;
+  --gold: #ffd97a;
+  --red: #c5202c;
+  --red-deep: #8b1118;
+  --green: #1f6e3a;
+  --snow: #f6fbff;
+}
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #0a1628;
+  font-family: 'Fredoka', system-ui, sans-serif;
+  color: #fef3d4;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: none;
+  overscroll-behavior: none;
+}
+
+canvas { display: block; outline: none; }
+
+.game-root {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+}
+
+.canvas-wrap {
+  position: absolute;
+  inset: 0;
+  cursor: pointer;
+}
+
+.status-tag {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #ffd97a;
+  font-family: 'Mountains of Christmas', cursive;
+  font-size: 1.3rem;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.6);
+  pointer-events: none;
+  z-index: 10;
+  animation: pulseGlow 1.4s ease-in-out infinite;
+}
+
+/* HUD */
+.hud-top {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  right: 14px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.hud-card {
+  background: linear-gradient(180deg, rgba(20,30,60,0.85), rgba(10,15,35,0.85));
+  border: 2px solid rgba(255,217,122,0.55);
+  border-radius: 14px;
+  padding: 6px 14px;
+  min-width: 80px;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+}
+
+.hud-label {
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  color: #ffd97a;
+  font-weight: 700;
+}
+
+.hud-value {
+  font-family: 'Mountains of Christmas', cursive;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: #fff8e0;
+}
+
+.hud-card.lives { display: flex; gap: 4px; padding: 10px 14px; }
+.heart {
+  font-size: 1.3rem;
+  transition: opacity 0.3s, transform 0.3s;
+}
+.heart.alive { color: #ff5070; text-shadow: 0 0 8px rgba(255,80,112,0.6); }
+.heart.lost { color: #444; opacity: 0.4; transform: scale(0.85); }
+
+.mute-btn {
+  margin-left: auto;
+  pointer-events: auto;
+  background: rgba(20,30,60,0.85);
+  border: 2px solid rgba(255,217,122,0.55);
+  border-radius: 12px;
+  width: 44px;
+  height: 44px;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: #fff8e0;
+}
+
+/* Overlays */
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(ellipse at center, rgba(8,12,28,0.55) 0%, rgba(8,12,28,0.85) 100%);
+  z-index: 20;
+  padding: 20px;
+}
+
+.overlay-card {
+  text-align: center;
+  background: linear-gradient(180deg, rgba(28,40,80,0.92), rgba(12,20,50,0.95));
+  border: 3px solid rgba(255,217,122,0.6);
+  border-radius: 24px;
+  padding: 36px 44px;
+  max-width: 460px;
+  box-shadow: 0 18px 50px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,255,255,0.06);
+}
+
+.title {
+  font-family: 'Mountains of Christmas', cursive;
+  font-size: 3.6rem;
+  margin: 0 0 8px;
+  color: #fff8e0;
+  text-shadow:
+    0 4px 0 #5a0a10,
+    0 0 30px rgba(255,217,122,0.55);
+  line-height: 1;
+}
+.title-3d {
+  color: #ffd97a;
+  font-style: italic;
+  display: inline-block;
+  transform: rotate(-6deg);
+  margin-left: 6px;
+}
+
+.subtitle {
+  color: #cfd8ee;
+  margin: 6px 0 22px;
+  font-size: 1rem;
+}
+
+.controls-hint {
+  margin-top: 18px;
+  color: #b9c4dd;
+  font-size: 0.9rem;
+}
+.controls-hint strong {
+  background: rgba(255,217,122,0.18);
+  border: 1px solid rgba(255,217,122,0.4);
+  border-radius: 6px;
+  padding: 2px 8px;
+  margin: 0 2px;
+  color: #fff8e0;
+}
+
+.best {
+  margin-top: 14px;
+  color: #ffd97a;
+  font-family: 'Mountains of Christmas', cursive;
+  font-size: 1.4rem;
+}
+
+.score-final {
+  font-size: 1.2rem;
+  color: #fff8e0;
+  margin: 6px 0;
+}
+.score-final span {
+  color: #ffd97a;
+  font-family: 'Mountains of Christmas', cursive;
+  font-size: 1.6rem;
+  margin-left: 8px;
+}
+
+.new-best {
+  color: #ffd97a;
+  font-family: 'Mountains of Christmas', cursive;
+  font-size: 1.6rem;
+  margin: 14px 0;
+  animation: pulseGlow 1s ease-in-out infinite;
+  text-shadow: 0 0 18px rgba(255,217,122,0.6);
+}
+
+.btn-festive {
+  background: linear-gradient(180deg, #d72030 0%, #8b1118 100%);
+  color: #fff8e0;
+  border: 3px solid #ffd97a;
+  border-radius: 999px;
+  padding: 0.85rem 2.5rem;
+  font-family: 'Mountains of Christmas', cursive;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  box-shadow: 0 6px 0 #5a0a10, 0 12px 30px rgba(0,0,0,0.5);
+  cursor: pointer;
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+  text-shadow: 0 2px 0 rgba(0,0,0,0.3);
+  margin-top: 12px;
+}
+.btn-festive:hover { transform: translateY(-1px); }
+.btn-festive:active { transform: translateY(4px); box-shadow: 0 2px 0 #5a0a10, 0 6px 16px rgba(0,0,0,0.4); }
+
+.btn-secondary {
+  display: block;
+  margin: 12px auto 0;
+  background: rgba(255,255,255,0.08);
+  border: 2px solid rgba(255,217,122,0.5);
+  color: #fef3d4;
+  border-radius: 999px;
+  padding: 0.55rem 1.4rem;
+  font-family: 'Fredoka', sans-serif;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 0.95rem;
+  backdrop-filter: blur(8px);
+}
+
+.hit-flash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 15;
+  background: radial-gradient(ellipse at center, rgba(255,40,40,0.0) 30%, rgba(255,40,40,0.45) 100%);
+  animation: flashHit 0.28s ease-out;
+}
+
+@keyframes pulseGlow {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.06); opacity: 0.92; }
+}
+
+@keyframes flashHit {
+  0% { opacity: 0; }
+  40% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@media (max-width: 600px) {
+  .title { font-size: 2.6rem; }
+  .overlay-card { padding: 24px 20px; }
+  .hud-card { min-width: 60px; padding: 4px 10px; }
+  .hud-value { font-size: 1.2rem; }
+}

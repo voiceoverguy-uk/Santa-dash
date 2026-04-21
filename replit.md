@@ -25,3 +25,21 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - `pnpm --filter @workspace/api-server run dev` — run API server locally
 
 See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.
+
+## Artifacts
+
+### santa-dash-3d (web)
+3D browser endless runner remake of the user's iOS game "Santa Dash". React Three Fiber, sprite-billboarded characters/obstacles on procedurally-generated 3D rooftop platforms.
+
+- **Location**: `artifacts/santa-dash-3d/`
+- **Stack**: React + Vite, three@0.184, @react-three/fiber@9, @react-three/drei
+- **Game architecture**: 
+  - `src/game/world.ts` — pure simulation (no React), mutated each frame via refs
+  - `src/game/Game.tsx` — Canvas + input + per-frame loop driver
+  - `src/game/store.ts` — minimal pub/sub store for HUD-only state (status, score, lives, distance)
+  - `src/game/audio.ts` — randomized rotation across 6 sound pools (Ready/jump/chim/trip/ice/end), iOS unlock on first gesture
+  - `src/game/{Santa,WorldRender,Background,Snow,CameraRig,HUD}.tsx` — render layers
+- **Assets** (in `public/`): 82 santa sprite frames (run/fall/hit/hitIce, "with bag" set), 4 obstacles (chimney/snowman/ice/presents), 7 rooftop textures, 2 backgrounds, 46 audio mp3s
+- **Controls**: Space / ↑ / W / tap to jump
+- **High score**: localStorage `santaDash:hi`
+- **No backend** — purely client-side
