@@ -36,8 +36,28 @@ const pools: Record<string, string[]> = {
 
 const elements: Record<string, HTMLAudioElement[]> = {};
 const lastIndex: Record<string, number> = {};
-let sfxMuted = false;
-let musicMuted = false;
+
+const SFX_MUTED_KEY = "santaDash3D.sfxMuted";
+const MUSIC_MUTED_KEY = "santaDash3D.musicMuted";
+
+function loadPref(key: string): boolean {
+  try {
+    return localStorage.getItem(key) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function savePref(key: string, value: boolean) {
+  try {
+    localStorage.setItem(key, value ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+}
+
+let sfxMuted = loadPref(SFX_MUTED_KEY);
+let musicMuted = loadPref(MUSIC_MUTED_KEY);
 let unlocked = false;
 
 let bgm: HTMLAudioElement | null = null;
@@ -124,11 +144,15 @@ export function playSound(key: keyof typeof pools) {
   if (DUCK_KEYS.has(key as string)) duckMusic(BGM_DUCK_MS);
 }
 
-export function setSfxMuted(m: boolean) { sfxMuted = m; }
+export function setSfxMuted(m: boolean) {
+  sfxMuted = m;
+  savePref(SFX_MUTED_KEY, m);
+}
 export function isSfxMuted() { return sfxMuted; }
 
 export function setMusicMuted(m: boolean) {
   musicMuted = m;
+  savePref(MUSIC_MUTED_KEY, m);
   if (!bgm) return;
   if (m) {
     bgm.pause();
