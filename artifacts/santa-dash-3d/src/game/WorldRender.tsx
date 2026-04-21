@@ -3,7 +3,7 @@ import { useFrame, useLoader } from "@react-three/fiber";
 import * as THREE from "three";
 import { OBSTACLES, ROOFTOPS } from "./assets";
 import type { World, Platform, Obstacle, Collectible } from "./world";
-import { PLATFORM_TOP, SNOW_CAP_HEIGHT } from "./world";
+import { SNOW_CAP_HEIGHT } from "./world";
 
 interface Props {
   world: React.MutableRefObject<World>;
@@ -252,5 +252,3 @@ function syncCollectibles(
   }
 }
 
-// avoid unused import warnings
-PLATFORM_TOP;
