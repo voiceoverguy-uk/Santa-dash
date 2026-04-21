@@ -1,5 +1,5 @@
 import { useStore, store } from "./store";
-import { isMuted, setMuted } from "./audio";
+import { isSfxMuted, setSfxMuted, isMusicMuted, setMusicMuted } from "./audio";
 import { useState } from "react";
 
 interface Props {
@@ -37,24 +37,36 @@ export function HUD({ onStart, onRestart }: Props) {
               <span key={i} className={`heart ${i < lives ? "alive" : "lost"}`}>♥</span>
             ))}
           </div>
-          <button
-            className="mute-btn"
-            onClick={() => { setMuted(!isMuted()); force((n) => n + 1); }}
-            aria-label={isMuted() ? "Unmute" : "Mute"}
-          >
-            {isMuted() ? "🔇" : "🔊"}
-          </button>
+          <div className="audio-controls">
+            <button
+              className="mute-btn"
+              onClick={(e) => { e.stopPropagation(); setMusicMuted(!isMusicMuted()); force((n) => n + 1); }}
+              aria-label={isMusicMuted() ? "Unmute music" : "Mute music"}
+              title={isMusicMuted() ? "Music off" : "Music on"}
+            >
+              {isMusicMuted() ? "🎵̶" : "🎵"}
+            </button>
+            <button
+              className="mute-btn"
+              onClick={(e) => { e.stopPropagation(); setSfxMuted(!isSfxMuted()); force((n) => n + 1); }}
+              aria-label={isSfxMuted() ? "Unmute" : "Mute"}
+              title={isSfxMuted() ? "Sound off" : "Sound on"}
+            >
+              {isSfxMuted() ? "🔇" : "🔊"}
+            </button>
+          </div>
         </div>
       )}
 
       {status === "menu" && (
         <div className="overlay">
           <div className="overlay-card">
-            <h1 className="title">Santa Dash <span className="title-3d">3D</span></h1>
-            <p className="subtitle">Help Santa hop the rooftops, grab the gifts and dodge the chimneys!</p>
-            <button className="btn-festive" onClick={onStart}>Start Run</button>
+            <h1 className="title">Santa Dash</h1>
+            <p className="subtitle">Hop the rooftops, grab the mince pies and dodge the chimneys!</p>
+            <button className="btn-festive" onClick={(e) => { e.stopPropagation(); onStart(); }}>Start Run</button>
             <div className="controls-hint">
               <strong>Space</strong> / <strong>↑</strong> / <strong>tap</strong> to jump
+              <div className="hint-secondary">Hold for a bigger jump · short tap for a hop</div>
             </div>
             {highScore > 0 && (
               <div className="best">Best: {highScore}</div>
@@ -75,10 +87,10 @@ export function HUD({ onStart, onRestart }: Props) {
             {score < highScore && (
               <div className="best">Best: {highScore}</div>
             )}
-            <button className="btn-festive" onClick={onRestart}>Run Again</button>
+            <button className="btn-festive" onClick={(e) => { e.stopPropagation(); onRestart(); }}>Run Again</button>
             <button
               className="btn-secondary"
-              onClick={() => store.setStatus("menu")}
+              onClick={(e) => { e.stopPropagation(); store.setStatus("menu"); }}
             >
               Main Menu
             </button>

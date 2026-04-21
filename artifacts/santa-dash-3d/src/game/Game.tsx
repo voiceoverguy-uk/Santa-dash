@@ -16,72 +16,79 @@ let runToken = 0;
 export function Game() {
   const worldRef = useRef<World>(new World());
   const status = useStore((s) => s.status);
-  const canvasWrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     preloadAudio();
   }, []);
 
-  // Keyboard input
+  // Keyboard input — variable jump (down = start, up = end)
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
+    const isJumpKey = (code: string) =>
+      code === "Space" || code === "ArrowUp" || code === "KeyW";
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!isJumpKey(e.code)) return;
+      e.preventDefault();
       if (e.repeat) return;
+      unlockAudio();
       const s = store.get().status;
-      if (e.code === "Space" || e.code === "ArrowUp" || e.code === "KeyW") {
-        e.preventDefault();
-        unlockAudio();
-        if (s === "menu" || s === "dead") {
-          startGame(worldRef.current);
-        } else if (s === "ready" || s === "playing") {
-          if (s === "ready") store.setStatus("playing");
-          if (worldRef.current.jump()) playSound("jump");
-        }
+      if (s === "menu" || s === "dead") {
+        startGame(worldRef.current);
+        return;
       }
+      if (s === "ready") store.setStatus("playing");
+      if (worldRef.current.startJump()) playSound("jump");
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (!isJumpKey(e.code)) return;
+      worldRef.current.endJump();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+    };
   }, []);
 
-  // Touch input — only on the canvas wrapper, not on overlay/HUD buttons.
-  // We attach to a dedicated div behind the HUD so taps on buttons aren't intercepted.
+  // Touch on the canvas wrapper — scoped so HUD/menu buttons aren't intercepted
   const onCanvasPointerDown = () => {
     unlockAudio();
     const s = store.get().status;
     if (s === "menu") {
       startGame(worldRef.current);
-    } else if (s === "ready" || s === "playing") {
-      if (s === "ready") store.setStatus("playing");
-      if (worldRef.current.jump()) playSound("jump");
+      return;
     }
-    // status==="dead" → require button press (avoid accidental restart)
+    if (s === "dead") return; // dead → require button press
+    if (s === "ready") store.setStatus("playing");
+    if (worldRef.current.startJump()) playSound("jump");
+  };
+  const onCanvasPointerUp = () => {
+    worldRef.current.endJump();
   };
 
-  const onStart = () => {
-    unlockAudio();
-    startGame(worldRef.current);
-  };
-  const onRestart = () => {
-    unlockAudio();
-    startGame(worldRef.current);
-  };
+  const onStart = () => { unlockAudio(); startGame(worldRef.current); };
+  const onRestart = () => { unlockAudio(); startGame(worldRef.current); };
 
   return (
     <div className="game-root">
-      {/* The canvas + a transparent tap layer that captures taps on empty area only */}
       <div
-        ref={canvasWrapRef}
         className="canvas-wrap"
         onPointerDown={onCanvasPointerDown}
+        onPointerUp={onCanvasPointerUp}
+        onPointerCancel={onCanvasPointerUp}
+        onPointerLeave={onCanvasPointerUp}
       >
         <Canvas
           shadows={false}
           dpr={[1, 2]}
           gl={{ antialias: true, powerPreference: "high-performance" }}
           camera={{ position: [4, 4, 13], fov: 50, near: 0.1, far: 200 }}
+          frameloop="always"
         >
           <color attach="background" args={["#0a1230"]} />
-          <fog attach="fog" args={["#1a2350", 30, 90]} />
-          <ambientLight intensity={0.85} />
+          <fog attach="fog" args={["#1a2350", 36, 100]} />
+          <ambientLight intensity={0.95} />
           <directionalLight position={[6, 12, 8]} intensity={1.1} color="#fff1d6" />
           <directionalLight position={[-8, 6, -4]} intensity={0.4} color="#9ec3ff" />
 
@@ -97,8 +104,8 @@ export function Game() {
       </div>
 
       <HUD onStart={onStart} onRestart={onRestart} />
-      {status === "menu" || status === "dead" ? null : (
-        <div className="status-tag">{status === "ready" ? "Tap or press Space to begin" : null}</div>
+      {status === "ready" && (
+        <div className="status-tag">Tap or press Space to begin</div>
       )}
     </div>
   );
@@ -111,7 +118,6 @@ function startGame(world: World) {
   playSound("ready");
 }
 
-// Drives the world simulation each frame
 function Loop({ world }: { world: React.MutableRefObject<World> }) {
   const endPlayedRef = useRef(false);
 
@@ -125,12 +131,11 @@ function Loop({ world }: { world: React.MutableRefObject<World> }) {
       }
       return;
     }
+    // Clamp dt — handles tab-switch spikes without making physics jumpy
     const dt = Math.min(dtRaw, 1 / 30);
     const w = world.current;
     const ev = w.tick(dt);
-    if (ev.collected > 0) {
-      store.addScore(ev.collected * 10);
-    }
+    if (ev.collected > 0) store.addScore(ev.collected * 10);
     if (ev.hit) {
       if (ev.hit === "ice") playSound("ice");
       else playSound("chim");
@@ -140,10 +145,10 @@ function Loop({ world }: { world: React.MutableRefObject<World> }) {
       playSound("trip");
       const myToken = runToken;
       setTimeout(() => {
-        if (myToken !== runToken) return; // a new run started
+        if (myToken !== runToken) return;
         if (store.get().status !== "playing") return;
         while (store.get().lives > 0) store.loseLife();
-      }, 600);
+      }, 700);
     }
     store.setDistance(w.santaX);
     if (Math.random() < dt * 2) store.addScore(1);

@@ -101,17 +101,32 @@ canvas { display: block; outline: none; }
 .heart.alive { color: #ff5070; text-shadow: 0 0 8px rgba(255,80,112,0.6); }
 .heart.lost { color: #444; opacity: 0.4; transform: scale(0.85); }
 
-.mute-btn {
+.audio-controls {
   margin-left: auto;
+  display: flex;
+  gap: 6px;
   pointer-events: auto;
+}
+.mute-btn {
   background: rgba(20,30,60,0.85);
   border: 2px solid rgba(255,217,122,0.55);
   border-radius: 12px;
   width: 44px;
   height: 44px;
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   cursor: pointer;
   color: #fff8e0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.mute-btn:hover { background: rgba(40,55,100,0.9); }
+
+.hint-secondary {
+  margin-top: 8px;
+  font-size: 0.8rem;
+  color: #9aa6c4;
+  font-weight: 400;
 }
 
 /* Overlays */

@@ -72,7 +72,8 @@ export const store = {
 export function useStore<T>(selector: (s: State) => T): T {
   const [val, setVal] = useState(() => selector(state));
   useEffect(() => {
-    return store.subscribe((s) => setVal(selector(s)));
+    const unsub = store.subscribe((s) => setVal(selector(s)));
+    return () => { unsub(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   return val;

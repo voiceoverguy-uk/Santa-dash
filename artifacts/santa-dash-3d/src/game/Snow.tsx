@@ -7,7 +7,7 @@ interface Props {
   world: React.MutableRefObject<World>;
 }
 
-const COUNT = 220;
+const COUNT = 140;
 
 export function Snow({ world }: Props) {
   const pointsRef = useRef<THREE.Points>(null);

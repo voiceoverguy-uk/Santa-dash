@@ -1,0 +1,8 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "o-RTSOb6p8mv9efbd9RiM"
+uri = "file://artifacts/santa-dash-3d/public/sprites/obstacles/mincepie.png"
+type = "image"
+title = "mince pie collectible"
