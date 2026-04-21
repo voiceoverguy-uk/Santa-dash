@@ -4,27 +4,29 @@ import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
+// PORT is only required when starting the dev/preview server. Production
+// builds (e.g. Vercel) just emit static assets and don't need a port.
 const rawPort = process.env.PORT;
+const isServingCommand =
+  process.argv.includes("dev") ||
+  process.argv.includes("serve") ||
+  process.argv.includes("preview");
 
-if (!rawPort) {
+if (isServingCommand && !rawPort) {
   throw new Error(
     "PORT environment variable is required but was not provided.",
   );
 }
 
-const port = Number(rawPort);
+const port = rawPort ? Number(rawPort) : 5173;
 
-if (Number.isNaN(port) || port <= 0) {
+if (isServingCommand && (Number.isNaN(port) || port <= 0)) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-const basePath = process.env.BASE_PATH;
-
-if (!basePath) {
-  throw new Error(
-    "BASE_PATH environment variable is required but was not provided.",
-  );
-}
+// BASE_PATH lets Replit serve each artifact at a sub-path. Outside Replit
+// (e.g. Vercel) the app is served at root, so default to "/".
+const basePath = process.env.BASE_PATH ?? "/";
 
 export default defineConfig({
   base: basePath,
