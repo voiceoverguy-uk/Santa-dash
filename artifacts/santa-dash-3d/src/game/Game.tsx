@@ -55,6 +55,7 @@ export function Game() {
       if (e.repeat) return;
       unlockAudio();
       const s = store.get().status;
+      if (s === "dying") return; // ignore input during the death pause
       if (s === "menu" || s === "dead") {
         startGame(worldRef.current);
         return;
@@ -88,7 +89,7 @@ export function Game() {
       startGame(worldRef.current);
       return;
     }
-    if (s === "dead") return; // dead → require button press
+    if (s === "dead" || s === "dying") return; // require button press
     if (s === "paused") return; // paused → require Resume button
     if (s === "ready") store.setStatus("playing");
     if (worldRef.current.startJump()) playSound("jump");
@@ -155,8 +156,9 @@ function Loop({ world }: { world: React.MutableRefObject<World> }) {
   useFrame((_, dtRaw) => {
     const status = store.get().status;
     if (status !== "playing") {
-      if (status !== "dead") endPlayedRef.current = false;
-      else if (!endPlayedRef.current) {
+      if (status !== "dead" && status !== "dying") {
+        endPlayedRef.current = false;
+      } else if (!endPlayedRef.current) {
         endPlayedRef.current = true;
         // Endgame voice fires AFTER a 3-second pause so the player has a
         // beat to register the death before the game-over taunt plays.

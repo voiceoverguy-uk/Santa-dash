@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { PowerUpKind } from "./world";
 import { POWERUP_DURATION } from "./world";
 
-export type GameStatus = "menu" | "ready" | "playing" | "paused" | "dead";
+export type GameStatus = "menu" | "ready" | "playing" | "paused" | "dying" | "dead";
 
 export interface PowerUpState {
   kind: PowerUpKind;
@@ -42,6 +42,9 @@ const initial: State = {
 
 let state: State = { ...initial };
 const listeners = new Set<Listener>();
+// Token so a queued "dying → dead" promotion from a previous run can't fire
+// after the player has restarted.
+let deathToken = 0;
 
 function emit() {
   for (const l of listeners) l(state);
@@ -58,6 +61,7 @@ export const store = {
     return () => listeners.delete(l);
   },
   reset: () => {
+    deathToken++;
     state = {
       ...state,
       status: "ready",
@@ -123,7 +127,17 @@ export const store = {
     if (lives <= 0) {
       const highScore = Math.max(state.score, state.highScore);
       localStorage.setItem("santaDash:hi", String(highScore));
-      state = { ...state, status: "dead", highScore };
+      // Enter "dying": world freezes, death audio gets a beat to play, but the
+      // Game Over overlay is held back for 1.5s so the player can't tap-restart
+      // through the death sound.
+      state = { ...state, status: "dying", highScore };
+      const dyingToken = ++deathToken;
+      setTimeout(() => {
+        if (deathToken !== dyingToken) return;
+        if (state.status !== "dying") return;
+        state = { ...state, status: "dead" };
+        emit();
+      }, 1500);
     }
     emit();
   },
