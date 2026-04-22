@@ -22,6 +22,15 @@ import {
 // Run-scoped token to invalidate any pending timers from previous runs
 let runToken = 0;
 
+// Map an obstacle kind to the sfx pool used when Santa hits it.
+// chimney → santachim* ("ow my noggin"), snowman/presents → santatrip* ("oof"),
+// ice → ice/slip pool.
+function obstacleSoundPool(kind: "chimney" | "snowman" | "ice" | "presents") {
+  if (kind === "ice") return "ice";
+  if (kind === "chimney") return "chim";
+  return "trip";
+}
+
 export function Game() {
   const worldRef = useRef<World>(new World());
   const status = useStore((s) => s.status);
@@ -114,14 +123,12 @@ export function Game() {
           shadows={false}
           dpr={[1, 2]}
           gl={{ antialias: true, powerPreference: "high-performance" }}
-          camera={{ position: [4, 4, 13], fov: 50, near: 0.1, far: 200 }}
+          orthographic
+          camera={{ position: [4, 4, 20], zoom: 50, near: 0.1, far: 60 }}
           frameloop="always"
         >
           <color attach="background" args={["#0a1230"]} />
-          <fog attach="fog" args={["#1a2350", 36, 100]} />
-          <ambientLight intensity={0.95} />
-          <directionalLight position={[6, 12, 8]} intensity={1.1} color="#fff1d6" />
-          <directionalLight position={[-8, 6, -4]} intensity={0.4} color="#9ec3ff" />
+          <ambientLight intensity={1.0} />
 
           <Suspense fallback={null}>
             <Background world={worldRef} />
@@ -187,13 +194,11 @@ function Loop({ world }: { world: React.MutableRefObject<World> }) {
     }
     if (ev.shieldedHit) {
       // Shield absorbed — same audio cue as obstacle but no life lost
-      if (ev.shieldedHit === "ice") playSound("ice");
-      else playSound("chim");
+      playSound(obstacleSoundPool(ev.shieldedHit));
       store.set({ hitFlash: performance.now() });
     }
     if (ev.hit) {
-      if (ev.hit === "ice") playSound("ice");
-      else playSound("chim");
+      playSound(obstacleSoundPool(ev.hit));
       store.loseLife();
     }
     if (ev.fellOff) {

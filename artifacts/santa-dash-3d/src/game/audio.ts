@@ -16,10 +16,7 @@ function range(a: number, b: number) {
 const pools: Record<string, string[]> = {
   ready: range(1, 11).map((i) => `${BASE}/ready${i}.mp3`),
   jump: range(1, 6).map((i) => `${BASE}/santajump${i}.mp3`),
-  chim: [
-    ...range(1, 13).map((i) => `${BASE}/santachim${i}.mp3`),
-    ...range(1, 11).map((i) => `${BASE}/fire${i}.mp3`),
-  ],
+  chim: range(1, 13).map((i) => `${BASE}/santachim${i}.mp3`),
   trip: range(1, 7).map((i) => `${BASE}/santatrip${i}.mp3`),
   ice: [
     ...range(1, 9).map((i) => `${BASE}/santaice${i}.mp3`),

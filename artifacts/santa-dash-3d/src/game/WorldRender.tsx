@@ -270,16 +270,17 @@ function buildPlatformMesh(p: Platform, textures: THREE.Texture[]): THREE.Group 
   const tilesX = Math.max(1, Math.round(p.width / tileWidth));
   tex.repeat.set(tilesX, 1);
 
-  const bodyMat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.95, metalness: 0 });
+  const bodyMat = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false });
   bodyMat.userData.ownsTexture = true;
   const body = new THREE.Mesh(
-    new THREE.BoxGeometry(p.width, totalH, 2.4),
+    new THREE.PlaneGeometry(p.width, totalH),
     bodyMat,
   );
-  // Top of body sits at +SNOW_CAP_HEIGHT so Santa's foot rest (which the
+  // Top of plane sits at +SNOW_CAP_HEIGHT so Santa's foot rest (which the
   // physics already places at p.topY + SNOW_CAP_HEIGHT) lands on the snowy
   // top edge of the source texture.
   body.position.y = SNOW_CAP_HEIGHT - totalH / 2;
+  body.position.z = 0;
   g.add(body);
 
   return g;
@@ -318,20 +319,20 @@ function syncObstacles(
       let visW: number, visH: number;
       if (o.kind === "snowman") {
         tex = textures.snowmanTex;
-        visW = o.w * 2.6;
-        visH = o.h * 3.0;
+        visW = o.w * 2.4;
+        visH = o.h * 2.6;
       } else if (o.kind === "ice") {
         tex = textures.iceTex;
         visW = o.w * 1.7;
         visH = o.h * 3.2;
       } else if (o.kind === "presents") {
         tex = textures.presentsTex;
-        visW = o.w * 2.3;
-        visH = o.h * 2.8;
+        visW = o.w * 2.6;
+        visH = o.h * 3.0;
       } else {
         tex = textures.chimneyTex;
-        visW = o.w * 2.4;
-        visH = o.h * 3.2;
+        visW = o.w * 2.6;
+        visH = o.h * 3.0;
       }
       m = new THREE.Mesh(
         new THREE.PlaneGeometry(visW, visH),

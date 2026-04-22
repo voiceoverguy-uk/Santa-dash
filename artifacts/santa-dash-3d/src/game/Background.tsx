@@ -15,28 +15,14 @@ export function Background({ world }: Props) {
     snowTex.colorSpace = THREE.SRGBColorSpace;
     snowTex.wrapS = THREE.RepeatWrapping;
     snowTex.wrapT = THREE.ClampToEdgeWrapping;
-    snowTex.repeat.set(1, 1);
     snowTex.anisotropy = 8;
   }, [snowTex]);
 
   const farRef = useRef<THREE.Mesh>(null);
+  const skyRef = useRef<THREE.Mesh>(null);
+  const moonRef = useRef<THREE.Mesh>(null);
+  const moonGlowRef = useRef<THREE.Mesh>(null);
 
-  useFrame(() => {
-    const w = world.current;
-    // Parallax — using texture offset rather than mesh position keeps the
-    // backdrop visually anchored at every camera position
-    if (farRef.current) {
-      const m = farRef.current.material as THREE.MeshBasicMaterial;
-      if (m.map) {
-        m.map.offset.x = (w.santaX * 0.012) % 1;
-      }
-      farRef.current.position.x = w.santaX;
-    }
-  });
-
-  // Single snowy mountain backdrop — we used to render a second tighter-tiled
-  // copy in front for "depth", but because it's the same source image it just
-  // looked like a doubled scene. One layer reads cleaner.
   const farTex = useMemo(() => {
     const t = snowTex.clone();
     t.needsUpdate = true;
@@ -46,11 +32,27 @@ export function Background({ world }: Props) {
     return t;
   }, [snowTex]);
 
+  useFrame(({ camera }) => {
+    const w = world.current;
+    // Pin the backdrop to the camera so it always fills the viewport,
+    // independent of how high Santa jumps (camera Y follows him).
+    const cx = camera.position.x;
+    const cy = camera.position.y;
+    if (skyRef.current) skyRef.current.position.set(cx, cy + 4, -30);
+    if (moonGlowRef.current) moonGlowRef.current.position.set(cx + 6, cy + 7, -25);
+    if (moonRef.current) moonRef.current.position.set(cx + 6, cy + 7, -24);
+    if (farRef.current) {
+      const m = farRef.current.material as THREE.MeshBasicMaterial;
+      if (m.map) m.map.offset.x = (w.santaX * 0.012) % 1;
+      farRef.current.position.set(cx, cy + 0.5, -20);
+    }
+  });
+
   return (
     <>
-      {/* Sky gradient */}
-      <mesh position={[0, 10, -70]}>
-        <planeGeometry args={[500, 80]} />
+      {/* Flat painted sky — single gradient plane, always behind everything */}
+      <mesh ref={skyRef} position={[0, 8, -30]}>
+        <planeGeometry args={[80, 50]} />
         <shaderMaterial
           attach="material"
           args={[{
@@ -79,19 +81,18 @@ export function Background({ world }: Props) {
       </mesh>
 
       {/* Soft moon */}
-      <mesh position={[10, 17, -55]}>
+      <mesh ref={moonGlowRef} position={[6, 11, -25]}>
         <circleGeometry args={[2.6, 32]} />
-        <meshBasicMaterial color="#fff5d8" toneMapped={false} />
-      </mesh>
-      <mesh position={[10, 17, -55.1]}>
-        <circleGeometry args={[3.8, 32]} />
         <meshBasicMaterial color="#ffd97a" transparent opacity={0.22} toneMapped={false} />
       </mesh>
+      <mesh ref={moonRef} position={[6, 11, -24]}>
+        <circleGeometry args={[1.6, 32]} />
+        <meshBasicMaterial color="#fff5d8" toneMapped={false} />
+      </mesh>
 
-      {/* Far snowy mountain backdrop — big, soft, tiles smoothly. Custom shader
-          so the top edge fades out into the sky and there's no visible seam. */}
-      <mesh ref={farRef} position={[0, 6, -45]}>
-        <planeGeometry args={[160, 26]} />
+      {/* Snowy mountain backdrop — painted flat, fades into sky at the top */}
+      <mesh ref={farRef} position={[0, 4, -20]}>
+        <planeGeometry args={[100, 18]} />
         <shaderMaterial
           attach="material"
           transparent
@@ -109,7 +110,6 @@ export function Background({ world }: Props) {
               varying vec2 vUv;
               void main() {
                 vec4 tex = texture2D(map, vUv);
-                // Fade out the top 35% so the plane edge disappears into the sky
                 float topFade = smoothstep(1.0, 0.65, vUv.y);
                 gl_FragColor = vec4(tex.rgb, tex.a * topFade);
               }
@@ -117,7 +117,6 @@ export function Background({ world }: Props) {
           }]}
         />
       </mesh>
-
     </>
   );
 }
