@@ -39,17 +39,6 @@ export interface Platform {
   variant: number; // which rooftop sprite
 }
 
-// Non-collidable rooftop decoration (pine trees, tiny background snowmen).
-// Spawned sparsely and rendered behind the gameplay plane.
-export type DecorationKind = "pine" | "smallsnowman";
-export interface Decoration {
-  id: number;
-  kind: DecorationKind;
-  x: number;
-  y: number;       // base of the decoration sits on snow surface
-  scale: number;   // size variation
-}
-
 let nextId = 1;
 const newId = () => nextId++;
 
@@ -93,7 +82,6 @@ export class World {
   obstacles: Obstacle[] = [];
   collectibles: Collectible[] = [];
   powerUps: PowerUp[] = [];
-  decorations: Decoration[] = [];
   // Santa state
   santaX = 0;
   santaY = santaRestY(PLATFORM_TOP);
@@ -127,7 +115,6 @@ export class World {
     this.obstacles = [];
     this.collectibles = [];
     this.powerUps = [];
-    this.decorations = [];
     this.santaX = 0;
     this.santaY = santaRestY(PLATFORM_TOP);
     this.santaVY = 0;
@@ -348,7 +335,6 @@ export class World {
     this.obstacles = this.obstacles.filter((o) => o.x > cullBefore);
     this.collectibles = this.collectibles.filter((c) => c.x > cullBefore);
     this.powerUps = this.powerUps.filter((p) => p.x > cullBefore);
-    this.decorations = this.decorations.filter((d) => d.x > cullBefore);
 
     // Spawn ahead
     while (this.spawnedTo < this.santaX + 60) this.spawnChunk();
@@ -428,28 +414,6 @@ export class World {
         y: cy,
         collected: false,
         missed: false,
-      });
-    }
-
-    // Sparse non-collidable rooftop decorations (pine trees, occasional
-    // small background snowmen). These add iOS-style painted character
-    // without changing gameplay — they sit at the back of the platform and
-    // are skipped near obstacle slots so they don't visually crowd them.
-    const decoCount = Math.random() < 0.85 ? 1 + Math.floor(Math.random() * 2) : 0;
-    for (let i = 0; i < decoCount; i++) {
-      const dx = platform.x + 0.6 + Math.random() * (width - 1.2);
-      // Stay clear of any obstacle x-position by at least 1.0 world unit.
-      const tooClose = this.obstacles.some(
-        (o) => Math.abs(o.x - dx) < 1.0 && o.x >= platform.x && o.x <= platform.x + width,
-      );
-      if (tooClose) continue;
-      const isPine = Math.random() < 0.85;
-      this.decorations.push({
-        id: newId(),
-        kind: isPine ? "pine" : "smallsnowman",
-        x: dx,
-        y: surfaceY,
-        scale: isPine ? 0.85 + Math.random() * 0.45 : 0.7 + Math.random() * 0.2,
       });
     }
 

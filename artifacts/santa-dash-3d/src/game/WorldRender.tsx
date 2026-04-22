@@ -2,7 +2,7 @@ import { useMemo, useRef } from "react";
 import { useFrame, useLoader } from "@react-three/fiber";
 import * as THREE from "three";
 import { OBSTACLES, ROOFTOPS } from "./assets";
-import type { World, Platform, Obstacle, Collectible, PowerUp, PowerUpKind, Decoration } from "./world";
+import type { World, Platform, Obstacle, Collectible, PowerUp, PowerUpKind } from "./world";
 import { SNOW_CAP_HEIGHT } from "./world";
 
 interface Props {
@@ -233,135 +233,6 @@ function getSnowCapTexture(): THREE.Texture {
   return tex;
 }
 
-// ---- Procedural decoration textures (rooftop pine trees + tiny snowmen) ----
-// These are non-collidable background-style props that sit on the snow.
-let _pineTex: THREE.Texture | null = null;
-function getPineTexture(): THREE.Texture {
-  if (_pineTex) return _pineTex;
-  const W = 256, H = 384;
-  const c = document.createElement("canvas");
-  c.width = W; c.height = H;
-  const ctx = c.getContext("2d")!;
-  ctx.clearRect(0, 0, W, H);
-
-  // Trunk
-  ctx.fillStyle = "#5b3a1f";
-  ctx.fillRect(W / 2 - 12, H - 50, 24, 50);
-  ctx.fillStyle = "rgba(0,0,0,0.18)";
-  ctx.fillRect(W / 2 - 12, H - 50, 6, 50);
-
-  // Three triangular tiers of foliage, painted with a flat dark green base
-  // plus lighter highlight bumps and a snow cap on top of each tier.
-  const tiers = [
-    { y: H - 50,  baseW: W * 0.85, height: 130 },
-    { y: H - 150, baseW: W * 0.65, height: 120 },
-    { y: H - 245, baseW: W * 0.42, height: 110 },
-  ];
-  for (const t of tiers) {
-    // Foliage body
-    ctx.fillStyle = "#1f5a32";
-    ctx.beginPath();
-    ctx.moveTo(W / 2 - t.baseW / 2, t.y);
-    ctx.lineTo(W / 2, t.y - t.height);
-    ctx.lineTo(W / 2 + t.baseW / 2, t.y);
-    ctx.closePath();
-    ctx.fill();
-    // Lighter highlight on left-facing edge
-    ctx.fillStyle = "#2f7d44";
-    ctx.beginPath();
-    ctx.moveTo(W / 2 - t.baseW / 2 + 8, t.y - 4);
-    ctx.lineTo(W / 2 - 4, t.y - t.height + 18);
-    ctx.lineTo(W / 2 + 8, t.y - 4);
-    ctx.closePath();
-    ctx.fill();
-    // Snow on top of tier — three rounded blobs
-    ctx.fillStyle = "#f7fbff";
-    ctx.beginPath();
-    ctx.arc(W / 2,         t.y - t.height + 6, 9, 0, Math.PI * 2);
-    ctx.arc(W / 2 - 24,    t.y - t.height + 22, 11, 0, Math.PI * 2);
-    ctx.arc(W / 2 + 24,    t.y - t.height + 22, 11, 0, Math.PI * 2);
-    ctx.fill();
-    // Small bright snow flecks on lower branches
-    ctx.fillStyle = "rgba(245,250,255,0.85)";
-    ctx.beginPath();
-    ctx.arc(W / 2 - t.baseW / 2 + 18, t.y - 8, 6, 0, Math.PI * 2);
-    ctx.arc(W / 2 + t.baseW / 2 - 18, t.y - 8, 6, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // Tip snow
-  ctx.fillStyle = "#ffffff";
-  ctx.beginPath();
-  ctx.arc(W / 2, H - 245 - 110 + 4, 8, 0, Math.PI * 2);
-  ctx.fill();
-
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
-  tex.magFilter = THREE.LinearFilter;
-  tex.minFilter = THREE.LinearMipMapLinearFilter;
-  _pineTex = tex;
-  return tex;
-}
-
-let _smallSnowmanTex: THREE.Texture | null = null;
-function getSmallSnowmanTexture(): THREE.Texture {
-  if (_smallSnowmanTex) return _smallSnowmanTex;
-  const W = 192, H = 256;
-  const c = document.createElement("canvas");
-  c.width = W; c.height = H;
-  const ctx = c.getContext("2d")!;
-  ctx.clearRect(0, 0, W, H);
-  // Bottom ball
-  ctx.fillStyle = "#f8fbff";
-  ctx.beginPath();
-  ctx.arc(W / 2, H - 60, 60, 0, Math.PI * 2);
-  ctx.fill();
-  // Middle ball
-  ctx.beginPath();
-  ctx.arc(W / 2, H - 140, 44, 0, Math.PI * 2);
-  ctx.fill();
-  // Head
-  ctx.beginPath();
-  ctx.arc(W / 2, H - 200, 32, 0, Math.PI * 2);
-  ctx.fill();
-  // Hat
-  ctx.fillStyle = "#1a1a1a";
-  ctx.fillRect(W / 2 - 28, H - 220, 56, 6);
-  ctx.fillRect(W / 2 - 18, H - 248, 36, 28);
-  // Eyes + carrot
-  ctx.fillStyle = "#222";
-  ctx.beginPath();
-  ctx.arc(W / 2 - 9, H - 205, 3, 0, Math.PI * 2);
-  ctx.arc(W / 2 + 9, H - 205, 3, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#ff8a3d";
-  ctx.beginPath();
-  ctx.moveTo(W / 2, H - 198);
-  ctx.lineTo(W / 2 + 14, H - 195);
-  ctx.lineTo(W / 2, H - 192);
-  ctx.closePath();
-  ctx.fill();
-  // Buttons
-  ctx.fillStyle = "#222";
-  ctx.beginPath();
-  ctx.arc(W / 2, H - 150, 3, 0, Math.PI * 2);
-  ctx.arc(W / 2, H - 135, 3, 0, Math.PI * 2);
-  ctx.arc(W / 2, H - 120, 3, 0, Math.PI * 2);
-  ctx.fill();
-  // Subtle blue shading
-  ctx.fillStyle = "rgba(150,190,225,0.25)";
-  ctx.beginPath();
-  ctx.arc(W / 2 + 18, H - 60, 50, 0, Math.PI * 2);
-  ctx.fill();
-
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
-  _smallSnowmanTex = tex;
-  return tex;
-}
-
 const POWERUP_STYLE: Record<PowerUpKind, { glyph: string; color: string; isEmoji: boolean }> = {
   magnet: { glyph: "🧲", color: "#ff8d8d", isEmoji: true },
   shield: { glyph: "🛡️", color: "#bfe4ff", isEmoji: true },
@@ -401,21 +272,26 @@ export function WorldRender({ world }: Props) {
       t.magFilter = THREE.LinearFilter;
       t.minFilter = THREE.LinearMipMapLinearFilter;
     }
+    // Roof panels: each panel is a discrete sprite covering UV 0..1, with the
+    // upper SOURCE_SNOW_FRAC cropped out (the painted snow that shipped on
+    // each PNG would otherwise peek out from behind our procedural snow cap).
+    // All panels share these textures, so we set the crop once globally.
     for (const t of roofTextures) {
-      t.wrapS = THREE.RepeatWrapping;
+      t.wrapS = THREE.ClampToEdgeWrapping;
       t.wrapT = THREE.ClampToEdgeWrapping;
+      t.repeat.set(1, 1 - SOURCE_SNOW_FRAC);
+      t.offset.set(0, 0);
+      t.needsUpdate = true;
     }
   }, [roofTextures, chimneyTex, snowmanTex, iceTex, presentsTex, mincePieTex]);
 
   const platformGroupRef = useRef<THREE.Group>(null);
-  const decorationGroupRef = useRef<THREE.Group>(null);
   const obstacleGroupRef = useRef<THREE.Group>(null);
   const collectibleGroupRef = useRef<THREE.Group>(null);
   const powerUpGroupRef = useRef<THREE.Group>(null);
   const auraRef = useRef<THREE.Group>(null);
 
   const platformMap = useRef(new Map<number, THREE.Group>());
-  const decorationMap = useRef(new Map<number, THREE.Mesh>());
   const obstacleMap = useRef(new Map<number, THREE.Mesh>());
   const collectibleMap = useRef(new Map<number, THREE.Mesh>());
   const powerUpMap = useRef(new Map<number, THREE.Mesh>());
@@ -427,7 +303,6 @@ export function WorldRender({ world }: Props) {
   useFrame(() => {
     const w = world.current;
     syncPlatforms(w.platforms, platformGroupRef.current!, platformMap.current, roofTextures);
-    syncDecorations(w.decorations, decorationGroupRef.current!, decorationMap.current);
     syncObstacles(
       w.obstacles,
       obstacleGroupRef.current!,
@@ -452,7 +327,6 @@ export function WorldRender({ world }: Props) {
   return (
     <>
       <group ref={platformGroupRef} />
-      <group ref={decorationGroupRef} />
       <group ref={obstacleGroupRef} />
       <group ref={collectibleGroupRef} />
       <group ref={powerUpGroupRef} />
@@ -509,46 +383,132 @@ const CAP_CENTER_Y = 0.262;          // see derivation in commit notes
 const CAP_TILE_WORLD_W = 10;          // one canvas tile = 10 world units
 const CAP_OVERHANG = 0.18;            // overhangs brick edge slightly
 
+// Crop the upper ~12% of every rooftop sprite so the painted snow that
+// shipped on each PNG doesn't peek out from behind our procedural snow cap.
+const SOURCE_SNOW_FRAC = 0.12;
+
+// Source-PNG aspect ratios. Sprites 1 and 7 are the wider end-cap variants
+// (124×640), the rest are 102×640. Indexed 1..7 to match filenames.
+const PANEL_NATURAL_ASPECT: Record<number, number> = {
+  1: 124 / 640,
+  2: 102 / 640,
+  3: 102 / 640,
+  4: 102 / 640,
+  5: 102 / 640,
+  6: 102 / 640,
+  7: 124 / 640,
+};
+const END_CAP_INDICES = [1, 7] as const;
+const BODY_INDICES = [2, 4, 6] as const;
+const WINDOW_INDICES = [3, 5] as const;
+// Ensure window-bearing panels are spaced out so the rooftop doesn't read
+// as a row of windows. Minimum body panels between two window panels.
+const MIN_BODY_GAP_BETWEEN_WINDOWS = 3;
+
+// Tiny deterministic PRNG so each platform's panel layout is stable across
+// re-renders but adjacent platforms differ.
+function mulberry32(seed: number) {
+  let a = seed >>> 0;
+  return function () {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// Plan a sequence of rooftop sprite indices (1..7) that stitches across the
+// platform width. Rules:
+//   - end-cap sprites (1/7) preferred at the leftmost & rightmost slots
+//   - never two identical sprites adjacent
+//   - window-bearing sprites (3/5) used sparingly, with at least
+//     MIN_BODY_GAP_BETWEEN_WINDOWS body panels between them
+function planRooftopPanels(platformId: number, width: number, brickH: number): number[] {
+  const rng = mulberry32(platformId * 0x9e3779b9);
+
+  const naturalW = (idx: number) => brickH * PANEL_NATURAL_ASPECT[idx];
+
+  // Pick from a candidate list, avoiding the previous index.
+  const pickAvoidPrev = (
+    candidates: readonly number[],
+    prev: number,
+  ): number => {
+    const filtered = candidates.filter((i) => i !== prev);
+    const list = filtered.length > 0 ? filtered : (candidates as readonly number[]);
+    return list[Math.floor(rng() * list.length)];
+  };
+
+  const panels: number[] = [];
+  let consumed = 0;
+  let prev = -1;
+  let bodyPanelsSinceWindow = MIN_BODY_GAP_BETWEEN_WINDOWS;
+
+  while (consumed < width - 0.05) {
+    const remaining = width - consumed;
+    const isFirst = panels.length === 0;
+    const endCapW = brickH * PANEL_NATURAL_ASPECT[1];
+
+    let pick: number;
+    if (isFirst && remaining >= endCapW * 0.85) {
+      // Leftmost slot: prefer end-cap
+      pick = pickAvoidPrev(END_CAP_INDICES, prev);
+    } else if (remaining <= endCapW * 1.4) {
+      // Rightmost-ish: prefer end-cap when there's only ~one slot left
+      pick = pickAvoidPrev(END_CAP_INDICES, prev);
+    } else {
+      // Interior: mostly body, occasional window when the spacing rule allows
+      const wantWindow = bodyPanelsSinceWindow >= MIN_BODY_GAP_BETWEEN_WINDOWS && rng() < 0.5;
+      pick = wantWindow
+        ? pickAvoidPrev(WINDOW_INDICES, prev)
+        : pickAvoidPrev(BODY_INDICES, prev);
+    }
+
+    panels.push(pick);
+    const isWindow = pick === 3 || pick === 5;
+    bodyPanelsSinceWindow = isWindow ? 0 : bodyPanelsSinceWindow + 1;
+    prev = pick;
+    consumed += naturalW(pick);
+  }
+
+  return panels;
+}
+
 function buildPlatformMesh(p: Platform, textures: THREE.Texture[]): THREE.Group {
   const g = new THREE.Group();
   // Group is anchored at the brick TOP (y = p.topY in world).
-  // We render the brick FAÇADE only (clipping out the small painted snow
-  // that's at the top of each rooftop sprite) and then paint a separate
-  // procedural snow cap on top of it. This gives the rooftops the
-  // characterful fluffy snow + drooping icicle look from the iOS game
-  // instead of looking like flat brick walls.
+  // We render the brick FAÇADE as a stitched row of distinct panel sprites
+  // (so wide rooftops don't read as a tiled row of identical windows) and
+  // then paint a separate procedural snow cap on top.
 
-  const srcTex = textures[p.variant % textures.length];
-  const tex = srcTex.clone();
-  tex.needsUpdate = true;
-  tex.wrapS = THREE.RepeatWrapping;
-  tex.wrapT = THREE.ClampToEdgeWrapping;
-
-  // Crop the upper ~12% of the source PNG (the painted snow the sprite
-  // shipped with) so it doesn't peek out from behind our new snow cap.
-  const SOURCE_SNOW_FRAC = 0.12;
-  tex.offset.y = 0;
-  tex.repeat.y = 1 - SOURCE_SNOW_FRAC;
-
-  // Pick horizontal tile count from the source aspect ratio so windows are
-  // rendered at their natural shape.
-  const img = srcTex.image as { width?: number; height?: number } | undefined;
-  const aspect = img && img.width && img.height ? img.width / img.height : 102 / 640;
   const brickH = PLATFORM_HEIGHT;
-  const tileWidth = Math.max(0.4, brickH * aspect);
-  const tilesX = Math.max(1, Math.round(p.width / tileWidth));
-  tex.repeat.x = tilesX;
+  const panels = planRooftopPanels(p.id, p.width, brickH);
 
-  const bodyMat = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false });
-  bodyMat.userData.ownsTexture = true;
-  const body = new THREE.Mesh(
-    new THREE.PlaneGeometry(p.width, brickH),
-    bodyMat,
+  // Panels are sized at their natural aspect; their total natural width
+  // rarely matches the platform width exactly, so we uniformly scale them
+  // to fit so the row ends flush with both edges of the platform.
+  const naturalTotal = panels.reduce(
+    (sum, idx) => sum + brickH * PANEL_NATURAL_ASPECT[idx],
+    0,
   );
-  // Brick top sits at local y = 0; brick extends downward by PLATFORM_HEIGHT.
-  body.position.y = -brickH / 2;
-  body.position.z = 0;
-  g.add(body);
+  const xScale = naturalTotal > 0 ? p.width / naturalTotal : 1;
+
+  let xCursor = -p.width / 2;
+  for (const idx of panels) {
+    const naturalW = brickH * PANEL_NATURAL_ASPECT[idx];
+    const panelW = naturalW * xScale;
+    const tex = textures[idx - 1]; // textures[] is 0-indexed (sprite 1 → [0])
+    const mat = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false });
+    // Don't dispose the shared loader-owned texture when this platform is
+    // recycled.
+    mat.userData.ownsTexture = false;
+    const panel = new THREE.Mesh(new THREE.PlaneGeometry(panelW, brickH), mat);
+    panel.position.x = xCursor + panelW / 2;
+    panel.position.y = -brickH / 2;
+    panel.position.z = 0;
+    g.add(panel);
+    xCursor += panelW;
+  }
 
   // Procedural snow cap on top of the brick — overhangs the front edge
   // with drooping icicles, fluffy humped top edge, soft blue underside.
@@ -578,6 +538,10 @@ function buildPlatformMesh(p: Platform, textures: THREE.Texture[]): THREE.Group 
   cap.renderOrder = 2;
   g.add(cap);
 
+  // Reference SNOW_CAP_HEIGHT to keep the import live (the constant sets the
+  // canvas layout in getSnowCapTexture); also helps any future readers.
+  void SNOW_CAP_HEIGHT;
+
   return g;
 }
 
@@ -593,56 +557,6 @@ const BOTTOM_PAD_FRAC: Record<string, number> = {
   presents: 444 / 1066,  // ~0.417
   mincepie: 142 / 1024,  // ~0.139
 };
-
-function syncDecorations(
-  decorations: Decoration[],
-  group: THREE.Group,
-  map: Map<number, THREE.Mesh>,
-) {
-  const seen = new Set<number>();
-  for (const d of decorations) {
-    seen.add(d.id);
-    let m = map.get(d.id);
-    if (!m) {
-      const isPine = d.kind === "pine";
-      const tex = isPine ? getPineTexture() : getSmallSnowmanTexture();
-      // Real-world heights chosen so pines feel like rooftop trees and
-      // small snowmen feel like background props. Aspect comes from the
-      // canvas size used in the texture functions.
-      const baseH = isPine ? 3.4 : 2.0;
-      const aspect = isPine ? 256 / 384 : 192 / 256;
-      const h = baseH * d.scale;
-      const w = h * aspect;
-      m = new THREE.Mesh(
-        new THREE.PlaneGeometry(w, h),
-        new THREE.MeshBasicMaterial({
-          map: tex,
-          transparent: true,
-          alphaTest: 0.04,
-          toneMapped: false,
-          depthWrite: false,
-        }),
-      );
-      m.renderOrder = 3;
-      map.set(d.id, m);
-      group.add(m);
-    }
-    const visH = (m.geometry as THREE.PlaneGeometry).parameters.height;
-    m.position.x = d.x;
-    // Plane is centered; lift so the bottom of the artwork sits on the snow.
-    m.position.y = d.y + visH / 2;
-    // Behind the obstacle/Santa plane so they read as background props.
-    m.position.z = 0.3;
-  }
-  for (const [id, mesh] of map) {
-    if (!seen.has(id)) {
-      group.remove(mesh);
-      mesh.geometry.dispose();
-      (mesh.material as THREE.Material).dispose();
-      map.delete(id);
-    }
-  }
-}
 
 function syncObstacles(
   obstacles: Obstacle[],

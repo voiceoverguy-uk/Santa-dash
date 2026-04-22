@@ -8,18 +8,18 @@ interface Props {
   world: React.MutableRefObject<World>;
 }
 
-// snow.jpg is an 8832×1242 painted panorama — the entire backdrop including
-// sky, mountains, trees, distant snowmen, fences, frozen waterfall, etc.
-// Aspect ratio ~ 7.11. We display it at its true aspect, fill the camera
-// viewport vertically, and pan UVs horizontally for a slow parallax behind
-// Santa. No procedural sky / moon — the painting handles all of that.
+// snow.jpg is an 8832×1242 painted panorama — sky, mountains, painted snowy
+// ground, distant trees, etc. We want the WHOLE painting visible vertically
+// behind Santa (so the player sees sky → mountains → ground meeting the
+// rooftops, just like the iOS original) — never zoomed-in on a middle band.
+// Each frame we resize the plane to match the orthographic camera's actual
+// visible viewport and pin it behind the camera, scrolling UVs horizontally
+// for slow parallax.
 const PANORAMA_ASPECT = 8832 / 1242;
-// Plane is sized large enough to fully cover the orthographic viewport in
-// any sane aspect ratio (portrait phones included) so the painted scene
-// never leaves a clear-color band above or below it. Width follows the
-// panorama's true aspect to avoid stretching.
-const PANORAMA_PLANE_H = 28;
-const PANORAMA_PLANE_W = PANORAMA_PLANE_H * PANORAMA_ASPECT;
+// Geometry baseline — actual world size is set via mesh.scale per frame so
+// the painting always exactly fills the viewport vertically.
+const BASE_PLANE_H = 1;
+const BASE_PLANE_W = PANORAMA_ASPECT;
 
 export function Background({ world }: Props) {
   const snowTex = useLoader(THREE.TextureLoader, BG.snow);
@@ -49,21 +49,28 @@ export function Background({ world }: Props) {
 
   useFrame(({ camera }) => {
     const w = world.current;
-    const cx = camera.position.x;
-    const cy = camera.position.y;
-    if (farRef.current) {
-      // Pin the panorama to the camera so it always fills the viewport,
-      // independent of how high Santa jumps (camera Y follows him).
-      farRef.current.position.set(cx, cy + 1.2, -20);
-      // Slow parallax — full panorama loops every ~330 santaX units. The
-      // texture wraps via RepeatWrapping so there's no hard reset.
-      farUniforms.uOffset.value = w.santaX * 0.003;
-    }
+    const ortho = camera as THREE.OrthographicCamera;
+    if (!farRef.current) return;
+
+    // Compute the actual visible world-space height of the orthographic
+    // viewport. (camera.top - camera.bottom) is the unzoomed frustum, divided
+    // by zoom gives the true visible world height.
+    const visibleH = (ortho.top - ortho.bottom) / ortho.zoom;
+
+    // Scale the unit-height plane to fully fill the viewport vertically while
+    // preserving the panorama's natural aspect (so mountains/ground are not
+    // stretched).
+    farRef.current.scale.set(visibleH, visibleH, 1);
+
+    // Pin the plane to the camera so the full painted scene is always
+    // visible no matter how high Santa jumps. UV offset gives the parallax.
+    farRef.current.position.set(camera.position.x, camera.position.y, -20);
+    farUniforms.uOffset.value = w.santaX * 0.003;
   });
 
   return (
-    <mesh ref={farRef} position={[0, 1.2, -20]}>
-      <planeGeometry args={[PANORAMA_PLANE_W, PANORAMA_PLANE_H]} />
+    <mesh ref={farRef} position={[0, 0, -20]}>
+      <planeGeometry args={[BASE_PLANE_W, BASE_PLANE_H]} />
       <shaderMaterial
         attach="material"
         args={[{
