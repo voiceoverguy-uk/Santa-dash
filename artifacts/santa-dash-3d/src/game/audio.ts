@@ -145,6 +145,13 @@ export function preloadAudio() {
     bgm.loop = true;
     bgm.volume = BGM_BASE_VOLUME;
     bgm.preload = "auto";
+    // Hint the browser to start downloading immediately so the file is ready
+    // by the time the user taps to start the game.
+    try {
+      bgm.load();
+    } catch {
+      /* ignore */
+    }
   }
 }
 
@@ -171,11 +178,10 @@ export function unlockAudio() {
 
   preloadAll();
 
-  // Music is HTMLAudio — needs its own gesture-driven start.
+  // Music is HTMLAudio — start it inside the user gesture so iOS unlocks it.
   if (bgm) {
     try {
       bgm.muted = false;
-      bgm.load();
     } catch {
       /* ignore */
     }
@@ -185,10 +191,32 @@ export function unlockAudio() {
 
 export function startMusic() {
   if (!bgm || musicMuted || bgmStarted) return;
+  const el = bgm;
   bgmStarted = true;
-  bgm.play().catch(() => {
-    bgmStarted = false;
-  });
+  const tryPlay = () => {
+    if (musicMuted) return;
+    const p = el.play();
+    if (p && typeof p.catch === "function") {
+      p.catch(() => {
+        // If play failed because the audio isn't loaded yet, wait for it
+        // to be ready and try again. iOS Safari needs this on slow networks.
+        bgmStarted = false;
+        const onReady = () => {
+          el.removeEventListener("canplaythrough", onReady);
+          el.removeEventListener("canplay", onReady);
+          if (!musicMuted && !bgmStarted) {
+            bgmStarted = true;
+            el.play().catch(() => {
+              bgmStarted = false;
+            });
+          }
+        };
+        el.addEventListener("canplaythrough", onReady, { once: true });
+        el.addEventListener("canplay", onReady, { once: true });
+      });
+    }
+  };
+  tryPlay();
 }
 
 export function playSound(key: keyof typeof pools) {
