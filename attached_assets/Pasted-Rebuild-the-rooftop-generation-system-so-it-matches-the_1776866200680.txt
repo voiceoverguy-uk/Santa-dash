@@ -1,0 +1,150 @@
+Rebuild the rooftop generation system so it matches the original Santa Dash logic much more closely.
+
+IMPORTANT:
+Do not generate generic platform blocks.
+Do not build floating box platforms with repeated windows.
+Do not treat decorative art tiles as gameplay/platform logic.
+Do not place windows randomly as if they define the structure.
+Do not embed chimneys into the wall/building tiles.
+Do not make the roofline uneven within a single building segment.
+The game must feel like the original Santa Dash first, before any visual upgrades.
+
+GOAL
+Create the level from 15–20 procedural rooftop buildings at a time, each with random width, height and obstacle placement, but visually assembled using the existing original assets.
+
+ASSET RULES
+Use these existing assets exactly as the visual source:
+
+1. Santa Roof tops
+- This folder contains 7 narrow vertical building slice images.
+- These are visual building columns only.
+- They should be repeated side by side to form a complete building.
+- Every completed building must contain at least 1 window slice somewhere in the run.
+- Building widths:
+  - minimum 2–3 slices
+  - average 4–7 slices
+  - occasional longer buildings 8–10 slices
+
+2. Santa Dash Other WorkParts
+These are placed ON TOP of roofs as separate gameplay items:
+- chimney.png = hazard
+- snowman.png = hazard
+- ice.png = slippery patch hazard
+- presents.png = collectible
+- 10.png and 12.png are snowy roof cap / roof decoration assets and can be used only as top-edge decoration, not as standalone gameplay platforms
+
+LEVEL GENERATION RULES
+Generate the world as a sequence of rooftop buildings with gaps between them.
+
+Each building must have:
+- a random width in slices
+- a random height level
+- a single flat playable roof surface across the whole building
+- at least 1 window slice somewhere in the building art
+- snowy roof top edge
+- optional roof-top gameplay items placed after the building is assembled
+
+Height variation:
+- change building height on almost every building
+- skyline should feel jagged like the original
+- buildings can be higher or lower than the previous one
+
+Gaps:
+- mix easy and trickier gaps
+- all gaps must remain fair and jumpable
+- account for the fact that holding jump makes Santa go higher/further
+- avoid impossible sequences
+
+GAMEPLAY / COLLISION RULES
+This is critical:
+- each building is ONE gameplay platform with ONE flat roof collision surface
+- the visual building is assembled from multiple narrow slices, but collision should be simple and flat
+- windows are decorative only and should have no special collision
+- snow overhangs and decorative top edges should not distort gameplay collision
+
+ROOF ITEM RULES
+After a building is created, optionally place roof-top items.
+
+Allowed roof items:
+- chimney
+- snowman
+- ice
+- presents
+
+Rules:
+- items must sit on top of the flat roof surface
+- collision should only come from the visible obstacle/item
+- items should not overlap each other
+- longer buildings may contain 2 items
+- shorter buildings usually contain 0–1 items
+- hazards/collectibles should feel more frequent than before, not sparse
+
+Suggested placement balance:
+- many buildings should contain something
+- longer buildings can contain combinations like:
+  - chimney + presents
+  - ice + presents
+  - snowman + presents
+  - chimney + ice
+- but keep each item in its own clear space with no overlap
+
+CHIMNEY BEHAVIOUR
+- chimney is a separate obstacle sprite placed on the roof
+- if Santa runs into the side of a chimney, he stumbles
+- if Santa lands on the chimney from above while airborne, he is bounced back upward
+- recreate a smoke effect for the chimney even if no dedicated smoke asset exists
+- if there is no smoke sprite asset, generate a lightweight animated smoke particle effect in code above the chimney
+- chimney smoke should visually suggest the “hot/burns his bottom” behaviour from the original
+
+ICE BEHAVIOUR
+- ice.png sits flush on the roof surface as a slippery patch
+- it may visually overhang slightly, but gameplay alignment must remain clean on the roof
+
+SNOWMAN BEHAVIOUR
+- snowman sits on top of roof as a separate obstacle
+- causes stumble / obstacle interaction, not bounce like chimney
+
+PRESENTS
+- presents are collectibles placed on top of roofs
+- place them in sensible positions along running lines and jump arcs
+
+VISUAL ASSEMBLY RULES
+For each building:
+1. choose width in slices
+2. choose building height
+3. assemble building body side by side using the 7 rooftop slice assets
+4. ensure at least one slice with a window appears in the run
+5. keep roof top visually flat and continuous
+6. then place hazards/collectibles on top
+
+Do not:
+- create tiny boxy platforms with multiple windows per short chunk unless that naturally comes from the source slices
+- use roof cap assets as separate floating blocks
+- create broken building tops
+- create uneven collision because of decorative snow shapes
+
+IMPLEMENTATION PREFERENCE
+Use a gameplay-first procedural generator:
+- first generate building data and platform logic
+- then render the building using the original art slices
+This must preserve the original Santa Dash gameplay feel.
+
+DEBUG / TEST MODE
+Add a temporary debug mode that logs or overlays:
+- building index
+- width in slices
+- height level
+- gap width
+- placed items
+This will help tune fairness and make the generator easier to fix.
+
+SUCCESS CRITERIA
+Done looks like this:
+- rooftops look like proper joined brick buildings, not random platform boxes
+- each building has a flat snowy top
+- buildings vary in width and height like the original
+- every building contains at least one window somewhere
+- chimneys, snowmen, ice and presents are placed as separate roof-top objects
+- chimneys behave correctly on side hit vs landing on top
+- smoke appears from chimneys
+- the game feels like the original Santa Dash, just rebuilt for web

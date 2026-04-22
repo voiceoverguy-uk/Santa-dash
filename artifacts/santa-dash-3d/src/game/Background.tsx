@@ -57,14 +57,19 @@ export function Background({ world }: Props) {
     // by zoom gives the true visible world height.
     const visibleH = (ortho.top - ortho.bottom) / ortho.zoom;
 
-    // Scale the unit-height plane to fully fill the viewport vertically while
-    // preserving the panorama's natural aspect (so mountains/ground are not
-    // stretched).
-    farRef.current.scale.set(visibleH, visibleH, 1);
+    // Scale the unit-height plane to (viewport + jump headroom) so the
+    // painted sky above the rooftops never runs out when Santa jumps.
+    // Headroom covers the maximum camera Y rise during a jump (~6 units).
+    const HEADROOM = 10;
+    const planeH = visibleH + HEADROOM;
+    farRef.current.scale.set(planeH, planeH, 1);
 
-    // Pin the plane to the camera so the full painted scene is always
-    // visible no matter how high Santa jumps. UV offset gives the parallax.
-    farRef.current.position.set(camera.position.x, camera.position.y, -20);
+    // Anchor the BOTTOM edge of the painted scene to the rooftop line
+    // (world y = 0, where brick tops sit). The painted snowy ground at the
+    // bottom of snow.jpg therefore always meets the brick tops, regardless
+    // of how high the camera rises during a jump. Only follow the camera
+    // horizontally for parallax.
+    farRef.current.position.set(camera.position.x, planeH / 2, -20);
     farUniforms.uOffset.value = w.santaX * 0.003;
   });
 

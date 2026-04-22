@@ -419,17 +419,15 @@ function mulberry32(seed: number) {
 }
 
 // Plan a sequence of rooftop sprite indices (1..7) that stitches across the
-// platform width. Rules:
-//   - end-cap sprites (1/7) preferred at the leftmost & rightmost slots
+// platform width to form ONE building. Rules (matching the original Santa
+// Dash assembly):
+//   - the leftmost & rightmost slices are end-caps (sprites 1 / 7)
 //   - never two identical sprites adjacent
-//   - window-bearing sprites (3/5) used sparingly, with at least
-//     MIN_BODY_GAP_BETWEEN_WINDOWS body panels between them
+//   - every building MUST contain at least one window slice somewhere
+//   - long buildings get a second window; otherwise a single window so the
+//     façade reads as a real house (1–2 windows), not a row of windows
 function planRooftopPanels(platformId: number, width: number, brickH: number): number[] {
   const rng = mulberry32(platformId * 0x9e3779b9);
-
-  const naturalW = (idx: number) => brickH * PANEL_NATURAL_ASPECT[idx];
-
-  // Pick from a candidate list, avoiding the previous index.
   const pickAvoidPrev = (
     candidates: readonly number[],
     prev: number,
@@ -439,38 +437,58 @@ function planRooftopPanels(platformId: number, width: number, brickH: number): n
     return list[Math.floor(rng() * list.length)];
   };
 
-  const panels: number[] = [];
-  let consumed = 0;
-  let prev = -1;
-  let bodyPanelsSinceWindow = MIN_BODY_GAP_BETWEEN_WINDOWS;
+  // Each slice is roughly one body sprite wide. We choose the slice count so
+  // the total natural width is close to the platform width; the renderer
+  // uniformly scales the row to fit exactly.
+  const avgSliceW = brickH * PANEL_NATURAL_ASPECT[2]; // 102/640 sprite
+  const sliceCount = Math.max(2, Math.round(width / avgSliceW));
 
-  while (consumed < width - 0.05) {
-    const remaining = width - consumed;
-    const isFirst = panels.length === 0;
-    const endCapW = brickH * PANEL_NATURAL_ASPECT[1];
+  // Window count: 1 for normal/short buildings, 2 for long buildings, 3 for
+  // very long (initial runway) ones. Capped so windows stay sparse.
+  let targetWindows = 1;
+  if (sliceCount >= 8) targetWindows = 2;
+  if (sliceCount >= 16) targetWindows = 3;
 
-    let pick: number;
-    if (isFirst && remaining >= endCapW * 0.85) {
-      // Leftmost slot: prefer end-cap
-      pick = pickAvoidPrev(END_CAP_INDICES, prev);
-    } else if (remaining <= endCapW * 1.4) {
-      // Rightmost-ish: prefer end-cap when there's only ~one slot left
-      pick = pickAvoidPrev(END_CAP_INDICES, prev);
-    } else {
-      // Interior: mostly body, occasional window when the spacing rule allows
-      const wantWindow = bodyPanelsSinceWindow >= MIN_BODY_GAP_BETWEEN_WINDOWS && rng() < 0.5;
-      pick = wantWindow
-        ? pickAvoidPrev(WINDOW_INDICES, prev)
-        : pickAvoidPrev(BODY_INDICES, prev);
+  // Pick which interior slice indices will be windows. Stay away from the
+  // end-caps and keep MIN_BODY_GAP_BETWEEN_WINDOWS body panels between any
+  // two windows.
+  const windowSlots = new Set<number>();
+  let attempts = 0;
+  while (windowSlots.size < targetWindows && attempts < 80) {
+    attempts++;
+    if (sliceCount < 3) break; // too small to host an interior window
+    const candidates: number[] = [];
+    for (let i = 1; i < sliceCount - 1; i++) {
+      if (windowSlots.has(i)) continue;
+      let ok = true;
+      for (const w of windowSlots) {
+        if (Math.abs(i - w) <= MIN_BODY_GAP_BETWEEN_WINDOWS) { ok = false; break; }
+      }
+      if (ok) candidates.push(i);
     }
-
-    panels.push(pick);
-    const isWindow = pick === 3 || pick === 5;
-    bodyPanelsSinceWindow = isWindow ? 0 : bodyPanelsSinceWindow + 1;
-    prev = pick;
-    consumed += naturalW(pick);
+    if (candidates.length === 0) break;
+    windowSlots.add(candidates[Math.floor(rng() * candidates.length)]);
+  }
+  // Guarantee at least one window even on tiny 2-slice buildings — replace
+  // an interior slice (or the rightmost-but-one) so end-caps stay intact.
+  if (windowSlots.size === 0 && sliceCount >= 2) {
+    windowSlots.add(Math.max(1, Math.floor(sliceCount / 2)));
   }
 
+  const panels: number[] = [];
+  let prev = -1;
+  for (let i = 0; i < sliceCount; i++) {
+    let pick: number;
+    if (windowSlots.has(i)) {
+      pick = pickAvoidPrev(WINDOW_INDICES, prev);
+    } else if (i === 0 || i === sliceCount - 1) {
+      pick = pickAvoidPrev(END_CAP_INDICES, prev);
+    } else {
+      pick = pickAvoidPrev(BODY_INDICES, prev);
+    }
+    panels.push(pick);
+    prev = pick;
+  }
   return panels;
 }
 
