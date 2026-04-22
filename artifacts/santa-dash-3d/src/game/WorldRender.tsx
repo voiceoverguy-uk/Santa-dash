@@ -2,7 +2,7 @@ import { useMemo, useRef } from "react";
 import { useFrame, useLoader } from "@react-three/fiber";
 import * as THREE from "three";
 import { OBSTACLES, ROOFTOPS } from "./assets";
-import type { World, Platform, Obstacle, Collectible, PowerUp, PowerUpKind } from "./world";
+import type { World, Platform, Obstacle, Collectible, PowerUp, PowerUpKind, Decoration } from "./world";
 import { SNOW_CAP_HEIGHT } from "./world";
 
 interface Props {
@@ -233,6 +233,123 @@ function getSnowCapTexture(): THREE.Texture {
   return tex;
 }
 
+// ---- Procedural decoration textures (rooftop pine trees + tiny snowmen) ----
+// These are non-collidable background-style props that sit on the snow.
+let _pineTex: THREE.Texture | null = null;
+function getPineTexture(): THREE.Texture {
+  if (_pineTex) return _pineTex;
+  const W = 256, H = 384;
+  const c = document.createElement("canvas");
+  c.width = W; c.height = H;
+  const ctx = c.getContext("2d")!;
+  ctx.clearRect(0, 0, W, H);
+
+  // Trunk
+  ctx.fillStyle = "#5b3a1f";
+  ctx.fillRect(W / 2 - 12, H - 50, 24, 50);
+  ctx.fillStyle = "rgba(0,0,0,0.18)";
+  ctx.fillRect(W / 2 - 12, H - 50, 6, 50);
+
+  // Three triangular tiers of foliage, painted with a flat dark green base
+  // plus lighter highlight bumps and a snow cap on top of each tier.
+  const tiers = [
+    { y: H - 50,  baseW: W * 0.85, height: 130 },
+    { y: H - 150, baseW: W * 0.65, height: 120 },
+    { y: H - 245, baseW: W * 0.42, height: 110 },
+  ];
+  for (const t of tiers) {
+    ctx.fillStyle = "#1f5a32";
+    ctx.beginPath();
+    ctx.moveTo(W / 2 - t.baseW / 2, t.y);
+    ctx.lineTo(W / 2, t.y - t.height);
+    ctx.lineTo(W / 2 + t.baseW / 2, t.y);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#2f7d44";
+    ctx.beginPath();
+    ctx.moveTo(W / 2 - t.baseW / 2 + 8, t.y - 4);
+    ctx.lineTo(W / 2 - 4, t.y - t.height + 18);
+    ctx.lineTo(W / 2 + 8, t.y - 4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#f7fbff";
+    ctx.beginPath();
+    ctx.arc(W / 2,         t.y - t.height + 6, 9, 0, Math.PI * 2);
+    ctx.arc(W / 2 - 24,    t.y - t.height + 22, 11, 0, Math.PI * 2);
+    ctx.arc(W / 2 + 24,    t.y - t.height + 22, 11, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(245,250,255,0.85)";
+    ctx.beginPath();
+    ctx.arc(W / 2 - t.baseW / 2 + 18, t.y - 8, 6, 0, Math.PI * 2);
+    ctx.arc(W / 2 + t.baseW / 2 - 18, t.y - 8, 6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath();
+  ctx.arc(W / 2, H - 245 - 110 + 4, 8, 0, Math.PI * 2);
+  ctx.fill();
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearMipMapLinearFilter;
+  _pineTex = tex;
+  return tex;
+}
+
+let _smallSnowmanTex: THREE.Texture | null = null;
+function getSmallSnowmanTexture(): THREE.Texture {
+  if (_smallSnowmanTex) return _smallSnowmanTex;
+  const W = 192, H = 256;
+  const c = document.createElement("canvas");
+  c.width = W; c.height = H;
+  const ctx = c.getContext("2d")!;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = "#f8fbff";
+  ctx.beginPath();
+  ctx.arc(W / 2, H - 60, 60, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(W / 2, H - 140, 44, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(W / 2, H - 200, 32, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#1a1a1a";
+  ctx.fillRect(W / 2 - 28, H - 220, 56, 6);
+  ctx.fillRect(W / 2 - 18, H - 248, 36, 28);
+  ctx.fillStyle = "#222";
+  ctx.beginPath();
+  ctx.arc(W / 2 - 9, H - 205, 3, 0, Math.PI * 2);
+  ctx.arc(W / 2 + 9, H - 205, 3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#ff8a3d";
+  ctx.beginPath();
+  ctx.moveTo(W / 2, H - 198);
+  ctx.lineTo(W / 2 + 14, H - 195);
+  ctx.lineTo(W / 2, H - 192);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "#222";
+  ctx.beginPath();
+  ctx.arc(W / 2, H - 150, 3, 0, Math.PI * 2);
+  ctx.arc(W / 2, H - 135, 3, 0, Math.PI * 2);
+  ctx.arc(W / 2, H - 120, 3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "rgba(150,190,225,0.25)";
+  ctx.beginPath();
+  ctx.arc(W / 2 + 18, H - 60, 50, 0, Math.PI * 2);
+  ctx.fill();
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  _smallSnowmanTex = tex;
+  return tex;
+}
+
 const POWERUP_STYLE: Record<PowerUpKind, { glyph: string; color: string; isEmoji: boolean }> = {
   magnet: { glyph: "🧲", color: "#ff8d8d", isEmoji: true },
   shield: { glyph: "🛡️", color: "#bfe4ff", isEmoji: true },
@@ -286,12 +403,14 @@ export function WorldRender({ world }: Props) {
   }, [roofTextures, chimneyTex, snowmanTex, iceTex, presentsTex, mincePieTex]);
 
   const platformGroupRef = useRef<THREE.Group>(null);
+  const decorationGroupRef = useRef<THREE.Group>(null);
   const obstacleGroupRef = useRef<THREE.Group>(null);
   const collectibleGroupRef = useRef<THREE.Group>(null);
   const powerUpGroupRef = useRef<THREE.Group>(null);
   const auraRef = useRef<THREE.Group>(null);
 
   const platformMap = useRef(new Map<number, THREE.Group>());
+  const decorationMap = useRef(new Map<number, THREE.Mesh>());
   const obstacleMap = useRef(new Map<number, THREE.Mesh>());
   const collectibleMap = useRef(new Map<number, THREE.Mesh>());
   const powerUpMap = useRef(new Map<number, THREE.Mesh>());
@@ -303,6 +422,7 @@ export function WorldRender({ world }: Props) {
   useFrame(() => {
     const w = world.current;
     syncPlatforms(w.platforms, platformGroupRef.current!, platformMap.current, roofTextures);
+    syncDecorations(w.decorations, decorationGroupRef.current!, decorationMap.current);
     syncObstacles(
       w.obstacles,
       obstacleGroupRef.current!,
@@ -327,6 +447,7 @@ export function WorldRender({ world }: Props) {
   return (
     <>
       <group ref={platformGroupRef} />
+      <group ref={decorationGroupRef} />
       <group ref={obstacleGroupRef} />
       <group ref={collectibleGroupRef} />
       <group ref={powerUpGroupRef} />
@@ -575,6 +696,64 @@ const BOTTOM_PAD_FRAC: Record<string, number> = {
   presents: 444 / 1066,  // ~0.417
   mincepie: 142 / 1024,  // ~0.139
 };
+
+function syncDecorations(
+  decorations: Decoration[],
+  group: THREE.Group,
+  map: Map<number, THREE.Mesh>,
+) {
+  const seen = new Set<number>();
+  for (const d of decorations) {
+    seen.add(d.id);
+    let m = map.get(d.id);
+    if (!m) {
+      const isPine = d.kind === "pine";
+      const tex = isPine ? getPineTexture() : getSmallSnowmanTexture();
+      // Real-world heights chosen so pines feel like rooftop trees and
+      // small snowmen feel like background props. Aspect comes from the
+      // canvas size used in the texture functions.
+      const baseH = isPine ? 3.4 : 2.0;
+      const aspect = isPine ? 256 / 384 : 192 / 256;
+      const h = baseH * d.scale;
+      const w = h * aspect;
+      m = new THREE.Mesh(
+        new THREE.PlaneGeometry(w, h),
+        new THREE.MeshBasicMaterial({
+          map: tex,
+          transparent: true,
+          alphaTest: 0.04,
+          toneMapped: false,
+          depthWrite: false,
+        }),
+      );
+      m.renderOrder = 3;
+      map.set(d.id, m);
+      group.add(m);
+    }
+    const visH = (m.geometry as THREE.PlaneGeometry).parameters.height;
+    m.position.x = d.x;
+    // Plane is centered; lift so the bottom of the artwork sits on the snow.
+    m.position.y = d.y + visH / 2;
+    // Slightly negative z so they sit BEHIND the obstacle plane (z=0.6) and
+    // the snow cap (z=0.05); they remain visible because the brick body only
+    // occupies y < 0 (below the snow surface) where decorations don't overlap.
+    m.position.z = -0.05;
+    // Gentle wind sway — only pines (snowmen stand still). Phase comes from
+    // the id so adjacent trees don't sway in lockstep.
+    if (d.kind === "pine") {
+      const t = performance.now() * 0.0012 + d.id * 0.7;
+      m.rotation.z = Math.sin(t) * 0.035;
+    }
+  }
+  for (const [id, mesh] of map) {
+    if (!seen.has(id)) {
+      group.remove(mesh);
+      mesh.geometry.dispose();
+      (mesh.material as THREE.Material).dispose();
+      map.delete(id);
+    }
+  }
+}
 
 function syncObstacles(
   obstacles: Obstacle[],
