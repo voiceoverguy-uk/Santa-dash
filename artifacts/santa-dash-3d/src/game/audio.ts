@@ -30,6 +30,8 @@ const pools: Record<string, string[]> = {
     `${BASE}/endgame50d.mp3`,
   ],
   combo: range(1, 6).map((i) => `${BASE}/santajump${i}.mp3`),
+  coin: [`${BASE}/coin.mp3`],
+  bonus: [`${BASE}/bonus.mp3`],
 };
 
 const SFX_MUTED_KEY = "santaDash3D.sfxMuted";
@@ -238,6 +240,8 @@ const POOL_THROTTLE_MS: Partial<Record<keyof typeof pools, number>> = {
   trip: 400,
   chim: 200,
   ice: 200,
+  coin: 60,
+  bonus: 400,
 };
 const lastPlayedAt: Record<string, number> = {};
 

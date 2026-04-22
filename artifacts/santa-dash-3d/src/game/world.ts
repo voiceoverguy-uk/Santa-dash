@@ -54,8 +54,8 @@ export function santaRestY(platformTopY: number) {
 
 const GRAVITY = -42;
 const JUMP_VELOCITY_INITIAL = 9;       // immediate liftoff (so a tap still pops you up)
-const JUMP_HOLD_FORCE = 38;            // additional upward accel while holding
-const JUMP_HOLD_MAX_DURATION = 0.28;   // seconds of extra force on hold
+const JUMP_HOLD_FORCE = 52;            // additional upward accel while holding (~30% taller hold-jump)
+const JUMP_HOLD_MAX_DURATION = 0.32;   // seconds of extra force on hold
 const JUMP_RELEASE_VY_CUT = 0.45;      // velocity multiplier when jump is released early
 
 export const POWERUP_DURATION: Record<PowerUpKind, number> = {

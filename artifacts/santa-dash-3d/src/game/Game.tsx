@@ -147,7 +147,7 @@ function Loop({ world }: { world: React.MutableRefObject<World> }) {
     const ev = w.tick(dt);
     if (ev.collected > 0) {
       // Coin "ding" per mince pie collected this tick
-      playSynth("coin");
+      playSound("coin");
     }
     if (ev.scoreGained > 0) {
       store.addScore(ev.scoreGained);
@@ -157,8 +157,8 @@ function Loop({ world }: { world: React.MutableRefObject<World> }) {
     store.setPowerUpTimers(w.powerUpTimers);
     if (ev.pickedPowerUp) {
       store.registerPowerUpPickup(ev.pickedPowerUp);
-      // Magnet / shield / 2× pickup: "level-up" cue (placeholder for LU.mp3)
-      playSynth("lu");
+      // Magnet / shield / 2× pickup
+      playSound("bonus");
     }
     if (ev.shieldedHit) {
       // Shield absorbed — same audio cue as obstacle but no life lost
