@@ -152,6 +152,21 @@ export function preloadAudio() {
     } catch {
       /* ignore */
     }
+    // Try to auto-start music. Most browsers will block this without a
+    // prior user gesture, so we also wire a one-time global listener that
+    // attempts to start music on the first interaction anywhere on the page.
+    startMusic();
+    const onFirstInteraction = () => {
+      window.removeEventListener("pointerdown", onFirstInteraction, true);
+      window.removeEventListener("keydown", onFirstInteraction, true);
+      window.removeEventListener("touchstart", onFirstInteraction, true);
+      const c = getCtx();
+      if (c && c.state === "suspended") c.resume().catch(() => {});
+      startMusic();
+    };
+    window.addEventListener("pointerdown", onFirstInteraction, true);
+    window.addEventListener("keydown", onFirstInteraction, true);
+    window.addEventListener("touchstart", onFirstInteraction, true);
   }
 }
 
