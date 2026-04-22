@@ -73,6 +73,7 @@ export function WorldRender({ world }: Props) {
   const chimneyTex = useLoader(THREE.TextureLoader, OBSTACLES.chimney);
   const snowmanTex = useLoader(THREE.TextureLoader, OBSTACLES.snowman);
   const iceTex = useLoader(THREE.TextureLoader, OBSTACLES.ice);
+  const presentsTex = useLoader(THREE.TextureLoader, OBSTACLES.presents);
   const mincePieTex = useLoader(THREE.TextureLoader, OBSTACLES.mincepie);
 
   const powerUpTextures = useMemo(() => {
@@ -84,7 +85,14 @@ export function WorldRender({ world }: Props) {
   }, []);
 
   useMemo(() => {
-    const all = [...roofTextures, chimneyTex, snowmanTex, iceTex, mincePieTex];
+    const all = [
+      ...roofTextures,
+      chimneyTex,
+      snowmanTex,
+      iceTex,
+      presentsTex,
+      mincePieTex,
+    ];
     for (const t of all) {
       t.colorSpace = THREE.SRGBColorSpace;
       t.anisotropy = 8;
@@ -95,7 +103,7 @@ export function WorldRender({ world }: Props) {
       t.wrapS = THREE.RepeatWrapping;
       t.wrapT = THREE.ClampToEdgeWrapping;
     }
-  }, [roofTextures, chimneyTex, snowmanTex, iceTex, mincePieTex]);
+  }, [roofTextures, chimneyTex, snowmanTex, iceTex, presentsTex, mincePieTex]);
 
   const platformGroupRef = useRef<THREE.Group>(null);
   const obstacleGroupRef = useRef<THREE.Group>(null);
@@ -119,7 +127,7 @@ export function WorldRender({ world }: Props) {
       w.obstacles,
       obstacleGroupRef.current!,
       obstacleMap.current,
-      { chimneyTex, snowmanTex, iceTex },
+      { chimneyTex, snowmanTex, iceTex, presentsTex },
     );
     syncCollectibles(
       w.collectibles,
@@ -235,11 +243,29 @@ function buildPlatformMesh(p: Platform, textures: THREE.Texture[]): THREE.Group 
   return g;
 }
 
+// Each sprite PNG has transparent padding around the actual content. To
+// land the visible content on the snow surface (rather than the plane's
+// bottom edge, which sits inside the padding), we shift the plane DOWN by
+// the bottom-padding fraction of the source image. Measurements below were
+// taken from the 1143x1066 source PNGs (mincepie is 1024x1024).
+const BOTTOM_PAD_FRAC: Record<string, number> = {
+  chimney: 500 / 1066,   // ~0.469
+  ice: 331 / 1066,       // ~0.310
+  snowman: 421 / 1066,   // ~0.395
+  presents: 444 / 1066,  // ~0.417
+  mincepie: 142 / 1024,  // ~0.139
+};
+
 function syncObstacles(
   obstacles: Obstacle[],
   group: THREE.Group,
   map: Map<number, THREE.Mesh>,
-  textures: { chimneyTex: THREE.Texture; snowmanTex: THREE.Texture; iceTex: THREE.Texture },
+  textures: {
+    chimneyTex: THREE.Texture;
+    snowmanTex: THREE.Texture;
+    iceTex: THREE.Texture;
+    presentsTex: THREE.Texture;
+  },
 ) {
   const seen = new Set<number>();
   for (const o of obstacles) {
@@ -250,16 +276,20 @@ function syncObstacles(
       let visW: number, visH: number;
       if (o.kind === "snowman") {
         tex = textures.snowmanTex;
-        visW = o.w * 1.6;
-        visH = o.h * 1.8;
+        visW = o.w * 2.6;
+        visH = o.h * 3.0;
       } else if (o.kind === "ice") {
         tex = textures.iceTex;
-        visW = o.w * 1.3;
-        visH = o.h * 2.2;
+        visW = o.w * 1.7;
+        visH = o.h * 3.2;
+      } else if (o.kind === "presents") {
+        tex = textures.presentsTex;
+        visW = o.w * 2.3;
+        visH = o.h * 2.8;
       } else {
         tex = textures.chimneyTex;
-        visW = o.w * 1.6;
-        visH = o.h * 1.9;
+        visW = o.w * 2.4;
+        visH = o.h * 3.2;
       }
       m = new THREE.Mesh(
         new THREE.PlaneGeometry(visW, visH),
@@ -276,10 +306,13 @@ function syncObstacles(
       map.set(o.id, m);
       group.add(m);
     }
-    // Position so the bottom of the visual sprite sits on the snow surface (o.y)
+    // Position so the visible CONTENT bottom sits on the snow surface (o.y).
+    // The plane is taller than the artwork — we offset down to compensate
+    // for the transparent padding under the content.
     const visH = (m.geometry as THREE.PlaneGeometry).parameters.height;
+    const padFrac = BOTTOM_PAD_FRAC[o.kind] ?? 0;
     m.position.x = o.x;
-    m.position.y = o.y + visH / 2;
+    m.position.y = o.y + visH / 2 - visH * padFrac;
     m.position.z = 0.6;
     m.visible = !o.hit || o.kind === "ice";
   }

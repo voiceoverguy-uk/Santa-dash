@@ -132,6 +132,34 @@ export function HUD({ onStart, onRestart }: Props) {
               <span><span className="leg-icon">✨</span> 2× Points</span>
             </div>
             <button className="btn-festive" onClick={(e) => { e.stopPropagation(); onStart(); }}>Start Run</button>
+            <div className="menu-options">
+              <label className="menu-toggle">
+                <input
+                  type="checkbox"
+                  checked={!isMusicMuted()}
+                  onChange={(e) => {
+                    e.stopPropagation();
+                    setMusicMuted(!e.target.checked);
+                    force((n) => n + 1);
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <span>🎵 Music</span>
+              </label>
+              <label className="menu-toggle">
+                <input
+                  type="checkbox"
+                  checked={!isSfxMuted()}
+                  onChange={(e) => {
+                    e.stopPropagation();
+                    setSfxMuted(!e.target.checked);
+                    force((n) => n + 1);
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <span>🔊 Sound effects</span>
+              </label>
+            </div>
             <div className="controls-hint">
               <strong>Space</strong> / <strong>↑</strong> / <strong>tap</strong> to jump
               <div className="hint-secondary">Hold for a bigger jump · short tap for a hop</div>

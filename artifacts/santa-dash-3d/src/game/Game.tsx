@@ -8,7 +8,14 @@ import { CameraRig } from "./CameraRig";
 import { HUD } from "./HUD";
 import { World } from "./world";
 import { store, useStore } from "./store";
-import { playSound, preloadAudio, unlockAudio, resetSfxThrottles } from "./audio";
+import {
+  playSound,
+  playSynth,
+  playSoundDelayed,
+  preloadAudio,
+  unlockAudio,
+  resetSfxThrottles,
+} from "./audio";
 
 // Run-scoped token to invalidate any pending timers from previous runs
 let runToken = 0;
@@ -67,8 +74,8 @@ export function Game() {
     worldRef.current.endJump();
   };
 
-  const onStart = () => { unlockAudio(); startGame(worldRef.current); };
-  const onRestart = () => { unlockAudio(); startGame(worldRef.current); };
+  const onStart = () => { unlockAudio(); playSynth("click"); startGame(worldRef.current); };
+  const onRestart = () => { unlockAudio(); playSynth("click"); startGame(worldRef.current); };
 
   return (
     <div className="game-root">
@@ -128,7 +135,9 @@ function Loop({ world }: { world: React.MutableRefObject<World> }) {
       if (status !== "dead") endPlayedRef.current = false;
       else if (!endPlayedRef.current) {
         endPlayedRef.current = true;
-        playSound("end");
+        // Endgame voice fires AFTER a 3-second pause so the player has a
+        // beat to register the death before the game-over taunt plays.
+        playSoundDelayed("end", 3000);
       }
       return;
     }
@@ -136,6 +145,10 @@ function Loop({ world }: { world: React.MutableRefObject<World> }) {
     const dt = Math.min(dtRaw, 1 / 30);
     const w = world.current;
     const ev = w.tick(dt);
+    if (ev.collected > 0) {
+      // Coin "ding" per mince pie collected this tick
+      playSynth("coin");
+    }
     if (ev.scoreGained > 0) {
       store.addScore(ev.scoreGained);
       if (ev.combo > 0 && ev.combo % 5 === 0) playSound("combo");
@@ -144,7 +157,8 @@ function Loop({ world }: { world: React.MutableRefObject<World> }) {
     store.setPowerUpTimers(w.powerUpTimers);
     if (ev.pickedPowerUp) {
       store.registerPowerUpPickup(ev.pickedPowerUp);
-      playSound("powerup");
+      // Magnet / shield / 2× pickup: "level-up" cue (placeholder for LU.mp3)
+      playSynth("lu");
     }
     if (ev.shieldedHit) {
       // Shield absorbed — same audio cue as obstacle but no life lost

@@ -1,6 +1,6 @@
 // Pure game world simulation — separate from rendering so we can mutate refs without React re-renders.
 
-export type ObstacleKind = "chimney" | "snowman" | "ice";
+export type ObstacleKind = "chimney" | "snowman" | "ice" | "presents";
 export type CollectibleKind = "mincepie";
 export type PowerUpKind = "magnet" | "shield" | "double";
 
@@ -373,10 +373,12 @@ export class World {
       const r = Math.random();
       let kind: ObstacleKind;
       let w: number, h: number;
-      if (r < 0.4) {
+      if (r < 0.32) {
         kind = "chimney"; w = 1.3; h = 1.7;
-      } else if (r < 0.75) {
+      } else if (r < 0.6) {
         kind = "snowman"; w = 1.2; h = 1.55;
+      } else if (r < 0.82) {
+        kind = "presents"; w = 1.4; h = 1.3;
       } else {
         kind = "ice"; w = 1.8; h = 0.45;
       }

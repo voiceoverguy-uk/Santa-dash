@@ -11,6 +11,8 @@ function range(a: number, b: number) {
   return out;
 }
 
+// Pools of file-based SFX. Synthesized SFX (coin / lu / click) live in their
+// own playSynth path below.
 const pools: Record<string, string[]> = {
   ready: range(1, 11).map((i) => `${BASE}/ready${i}.mp3`),
   jump: range(1, 6).map((i) => `${BASE}/santajump${i}.mp3`),
@@ -27,7 +29,6 @@ const pools: Record<string, string[]> = {
     ...range(1, 49).map((i) => `${BASE}/endgame${i}.mp3`),
     `${BASE}/endgame50d.mp3`,
   ],
-  powerup: range(1, 11).map((i) => `${BASE}/ready${i}.mp3`),
   combo: range(1, 6).map((i) => `${BASE}/santajump${i}.mp3`),
 };
 
@@ -146,27 +147,12 @@ export function preloadAudio() {
     bgm.volume = BGM_BASE_VOLUME;
     bgm.preload = "auto";
     // Hint the browser to start downloading immediately so the file is ready
-    // by the time the user taps to start the game.
+    // by the time the user presses Start Run.
     try {
       bgm.load();
     } catch {
       /* ignore */
     }
-    // Try to auto-start music. Most browsers will block this without a
-    // prior user gesture, so we also wire a one-time global listener that
-    // attempts to start music on the first interaction anywhere on the page.
-    startMusic();
-    const onFirstInteraction = () => {
-      window.removeEventListener("pointerdown", onFirstInteraction, true);
-      window.removeEventListener("keydown", onFirstInteraction, true);
-      window.removeEventListener("touchstart", onFirstInteraction, true);
-      const c = getCtx();
-      if (c && c.state === "suspended") c.resume().catch(() => {});
-      startMusic();
-    };
-    window.addEventListener("pointerdown", onFirstInteraction, true);
-    window.addEventListener("keydown", onFirstInteraction, true);
-    window.addEventListener("touchstart", onFirstInteraction, true);
   }
 }
 
@@ -267,10 +253,6 @@ export function playSound(key: keyof typeof pools) {
   const minGap = POOL_THROTTLE_MS[key] ?? 50;
   if (now - (lastPlayedAt[key] ?? 0) < minGap) return;
   lastPlayedAt[key] = now;
-  if (key === "end") {
-    console.log("[audio] playSound('end') fired");
-    console.trace();
-  }
 
   let idx = Math.floor(Math.random() * urls.length);
   if (urls.length > 1 && idx === lastIndex[key]) {
@@ -296,10 +278,33 @@ export function playSound(key: keyof typeof pools) {
   });
 }
 
+// Schedule a sound to play after `delayMs`, but only if the run-token still
+// matches when the timer fires. Used so the endgame voice plays a moment
+// AFTER santa actually drops between houses.
+let endTimer: ReturnType<typeof setTimeout> | null = null;
+export function playSoundDelayed(key: keyof typeof pools, delayMs: number) {
+  if (key === "end" && endTimer) {
+    clearTimeout(endTimer);
+    endTimer = null;
+  }
+  const t = setTimeout(() => {
+    if (key === "end") endTimer = null;
+    playSound(key);
+  }, delayMs);
+  if (key === "end") endTimer = t;
+}
+export function cancelDelayedEnd() {
+  if (endTimer) {
+    clearTimeout(endTimer);
+    endTimer = null;
+  }
+}
+
 // Reset throttles when a new game starts so previous-session timing can't
 // suppress legitimate sound effects.
 export function resetSfxThrottles() {
   for (const k of Object.keys(lastPlayedAt)) lastPlayedAt[k] = 0;
+  cancelDelayedEnd();
 }
 
 function playBuffer(c: AC, gain: GainNode, buf: AudioBuffer) {
@@ -311,6 +316,96 @@ function playBuffer(c: AC, gain: GainNode, buf: AudioBuffer) {
   } catch {
     /* ignore */
   }
+}
+
+// ---- Synthesized SFX (placeholders until coin.wav / LU.mp3 / but.mp3 are
+// uploaded). Each is a short, recognisable cue built with oscillators so the
+// game has the right "language" of sounds for collect / power-up / button.
+type SynthKey = "coin" | "lu" | "click";
+const SYNTH_THROTTLE_MS: Record<SynthKey, number> = {
+  coin: 60,
+  lu: 250,
+  click: 120,
+};
+const lastSynthAt: Record<SynthKey, number> = { coin: 0, lu: 0, click: 0 };
+
+export function playSynth(key: SynthKey) {
+  if (sfxMuted) return;
+  const c = ctx;
+  const gain = sfxGain;
+  if (!c || !gain) return;
+  const now = performance.now();
+  if (now - lastSynthAt[key] < SYNTH_THROTTLE_MS[key]) return;
+  lastSynthAt[key] = now;
+  if (c.state === "suspended") c.resume().catch(() => {});
+
+  if (key === "coin") {
+    // Bright two-note coin "ding" — square + sine pair.
+    coinDing(c, gain);
+  } else if (key === "lu") {
+    // Power-up "level-up" rising arpeggio C → E → G → C
+    levelUp(c, gain);
+  } else {
+    // Soft UI button click
+    buttonClick(c, gain);
+  }
+}
+
+function envelopeNote(
+  c: AC,
+  out: GainNode,
+  freq: number,
+  type: OscillatorType,
+  startOffset: number,
+  duration: number,
+  peak: number,
+) {
+  const osc = c.createOscillator();
+  const g = c.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, c.currentTime + startOffset);
+  g.gain.setValueAtTime(0, c.currentTime + startOffset);
+  g.gain.linearRampToValueAtTime(peak, c.currentTime + startOffset + 0.005);
+  g.gain.exponentialRampToValueAtTime(
+    0.0001,
+    c.currentTime + startOffset + duration,
+  );
+  osc.connect(g);
+  g.connect(out);
+  osc.start(c.currentTime + startOffset);
+  osc.stop(c.currentTime + startOffset + duration + 0.02);
+}
+
+function coinDing(c: AC, out: GainNode) {
+  // Classic two-note coin: A5 then E6
+  envelopeNote(c, out, 880, "square", 0, 0.08, 0.18);
+  envelopeNote(c, out, 1318.5, "square", 0.06, 0.18, 0.22);
+  envelopeNote(c, out, 2637, "sine", 0.06, 0.22, 0.1);
+}
+
+function levelUp(c: AC, out: GainNode) {
+  // C5 E5 G5 C6
+  const notes = [523.25, 659.25, 783.99, 1046.5];
+  notes.forEach((f, i) => {
+    envelopeNote(c, out, f, "triangle", i * 0.07, 0.16, 0.24);
+    envelopeNote(c, out, f * 2, "sine", i * 0.07, 0.18, 0.08);
+  });
+}
+
+function buttonClick(c: AC, out: GainNode) {
+  // Short downward chirp
+  const osc = c.createOscillator();
+  const g = c.createGain();
+  osc.type = "square";
+  osc.frequency.setValueAtTime(620, c.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(180, c.currentTime + 0.08);
+  g.gain.setValueAtTime(0, c.currentTime);
+  g.gain.linearRampToValueAtTime(0.2, c.currentTime + 0.005);
+  g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + 0.1);
+  osc.connect(g);
+  g.connect(out);
+  osc.start();
+  osc.stop(c.currentTime + 0.12);
 }
 
 export function setSfxMuted(m: boolean) {

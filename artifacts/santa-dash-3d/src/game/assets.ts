@@ -28,6 +28,7 @@ export const OBSTACLES = {
   chimney: `${BASE}sprites/obstacles/chimney.png`,
   snowman: `${BASE}sprites/obstacles/snowman.png`,
   ice: `${BASE}sprites/obstacles/ice.png`,
+  presents: `${BASE}sprites/obstacles/presents.png`,
   mincepie: `${BASE}sprites/obstacles/mincepie.png`,
 };
 
@@ -45,6 +46,7 @@ export const ALL_PRELOAD_TEXTURES: string[] = [
   OBSTACLES.chimney,
   OBSTACLES.snowman,
   OBSTACLES.ice,
+  OBSTACLES.presents,
   OBSTACLES.mincepie,
   BG.snow,
 ];
