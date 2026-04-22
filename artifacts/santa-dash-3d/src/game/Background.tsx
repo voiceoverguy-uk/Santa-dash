@@ -14,7 +14,11 @@ interface Props {
 // viewport vertically, and pan UVs horizontally for a slow parallax behind
 // Santa. No procedural sky / moon — the painting handles all of that.
 const PANORAMA_ASPECT = 8832 / 1242;
-const PANORAMA_PLANE_H = 16;
+// Plane is sized large enough to fully cover the orthographic viewport in
+// any sane aspect ratio (portrait phones included) so the painted scene
+// never leaves a clear-color band above or below it. Width follows the
+// panorama's true aspect to avoid stretching.
+const PANORAMA_PLANE_H = 28;
 const PANORAMA_PLANE_W = PANORAMA_PLANE_H * PANORAMA_ASPECT;
 
 export function Background({ world }: Props) {
