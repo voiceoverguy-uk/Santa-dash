@@ -441,9 +441,23 @@ export class World {
 
     // Sparse non-collidable rooftop decorations (pine trees, occasional
     // small background snowmen). These add iOS-style painted character
-    // without changing gameplay — they sit at the back of the platform and
-    // are skipped near obstacle slots so they don't visually crowd them.
-    const decoCount = Math.random() < 0.85 ? 1 + Math.floor(Math.random() * 2) : 0;
+    // without changing gameplay — they sit at the back of the platform
+    // and are skipped near obstacle slots so they don't visually crowd
+    // gameplay.
+    //
+    // Density rules (Task #18):
+    //   - Cap at ~1 decoration per 6.5 world units of width (max 3).
+    //   - Skip entirely if obstacles already fill most of the platform
+    //     (each obstacle occupies ~3.5u of slot space; if combined slot
+    //     coverage exceeds ~55% of width, leave the rooftop bare so the
+    //     play area reads cleanly).
+    const maxDecos = Math.min(3, Math.floor(width / 6.5));
+    const obstacleCoverage = obstacleCount * 3.5;
+    const crowded = obstacleCoverage > width * 0.55;
+    const wantedDecos = Math.random() < 0.85
+      ? 1 + Math.floor(Math.random() * 2)
+      : 0;
+    const decoCount = crowded ? 0 : Math.min(maxDecos, wantedDecos);
     for (let i = 0; i < decoCount; i++) {
       const dx = platform.x + 0.6 + Math.random() * (width - 1.2);
       // Stay clear of any obstacle x-position by at least 1.0 world unit.
@@ -464,7 +478,7 @@ export class World {
     // Festive string lights — drape across the top of wider buildings,
     // hanging just under the snow cap on the brick wall. Center is set so
     // the strip droops along the eaves; renderer pulses bulbs over time.
-    if (width >= 8 && Math.random() < 0.35) {
+    if (!crowded && width >= 8 && Math.random() < 0.35) {
       const span = width * (0.6 + Math.random() * 0.3);
       this.decorations.push({
         id: newId(),
@@ -479,7 +493,7 @@ export class World {
     // Occasional Christmas wreath hung on the brick wall — sparser than
     // pines, never near an obstacle column so it doesn't visually clash
     // with chimneys/snowmen on top.
-    if (width >= 5 && Math.random() < 0.18) {
+    if (!crowded && width >= 5 && Math.random() < 0.18) {
       const wx = platform.x + 1.4 + Math.random() * Math.max(0.1, width - 2.8);
       const tooClose = this.obstacles.some(
         (o) => Math.abs(o.x - wx) < 1.5 && o.x >= platform.x && o.x <= platform.x + width,
