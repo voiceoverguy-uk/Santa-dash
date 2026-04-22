@@ -86,7 +86,7 @@ export function Santa({ world }: Props) {
 
   return (
     <mesh ref={meshRef} position={[0, 1, 0.5]}>
-      <planeGeometry args={[2.4, 2.4]} />
+      <planeGeometry args={[2.6, 2.6]} />
       <meshBasicMaterial
         ref={matRef}
         map={runTextures[0]}
