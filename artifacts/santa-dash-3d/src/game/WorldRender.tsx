@@ -114,6 +114,125 @@ function makePowerUpTexture(
   return tex;
 }
 
+// ---- Procedural snow cap texture ----
+// A horizontally-tileable painted snow cap with a fluffy humped top edge,
+// a soft blue underside shadow, and a row of stalactite-like icicles
+// drooping down from the front. Designed to be repeated along the length
+// of every platform so the rooftops read as snow-covered houses (matching
+// the iOS painted look) instead of plain brick walls.
+let _snowCapTex: THREE.Texture | null = null;
+function getSnowCapTexture(): THREE.Texture {
+  if (_snowCapTex) return _snowCapTex;
+  const W = 512;
+  const H = 256;
+  const c = document.createElement("canvas");
+  c.width = W; c.height = H;
+  const ctx = c.getContext("2d")!;
+  ctx.clearRect(0, 0, W, H);
+
+  // V layout (top→bottom). These rows are tuned so that, at the chosen
+  // CAP_PLANE_H + CAP_CENTER_Y below, the BASE row maps to world y=0 (the
+  // brick top) and the SURFACE row maps to world y = SNOW_CAP_HEIGHT (0.55)
+  // — i.e. Santa's foot-rest sits exactly on the painted snow surface, not
+  // sunk into it.
+  //   0..82    : empty (room for hump peaks)
+  //   82..170  : snow body  (exactly SNOW_CAP_HEIGHT tall in world units)
+  //   170..256 : icicles dripping below the brick top
+  const SURFACE_Y = 82;
+  const BASE_Y = 170;
+
+  // Snow body — painted off-white with a humped top edge.
+  // We shape the top with a smooth wavy curve so it tiles seamlessly
+  // (same height at x=0 and x=W).
+  const humpAt = (x: number) => {
+    const u = (x / W) * Math.PI * 2;
+    return (
+      Math.sin(u) * 9 +
+      Math.sin(u * 2 + 1.3) * 5 +
+      Math.sin(u * 3 + 0.4) * 3
+    );
+  };
+  ctx.fillStyle = "#f6fbff";
+  ctx.beginPath();
+  ctx.moveTo(0, BASE_Y);
+  ctx.lineTo(0, SURFACE_Y - humpAt(0));
+  for (let x = 0; x <= W; x += 4) {
+    ctx.lineTo(x, SURFACE_Y - humpAt(x));
+  }
+  ctx.lineTo(W, BASE_Y);
+  ctx.closePath();
+  ctx.fill();
+
+  // Top highlight — bright rim along the very top of each hump
+  ctx.strokeStyle = "rgba(255,255,255,0.9)";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  for (let x = 0; x <= W; x += 4) {
+    const y = SURFACE_Y - humpAt(x) + 1.5;
+    if (x === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  // Cool blue underside shadow just above the front edge
+  const grad = ctx.createLinearGradient(0, BASE_Y - 22, 0, BASE_Y);
+  grad.addColorStop(0, "rgba(255,255,255,0)");
+  grad.addColorStop(1, "rgba(120,170,210,0.45)");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, BASE_Y - 22, W, 22);
+
+  // Front-edge dark line so the cap reads against the brick below
+  ctx.fillStyle = "rgba(80,130,180,0.55)";
+  ctx.fillRect(0, BASE_Y, W, 2);
+
+  // Icicles drooping down — varied widths and lengths, distributed so the
+  // pattern tiles (we mirror the leftmost icicle as the rightmost).
+  const drips = [
+    { cx: 30, w: 14, len: 50 },
+    { cx: 88, w: 9,  len: 32 },
+    { cx: 150, w: 18, len: 70 },
+    { cx: 220, w: 11, len: 42 },
+    { cx: 280, w: 8,  len: 26 },
+    { cx: 340, w: 16, len: 60 },
+    { cx: 400, w: 10, len: 38 },
+    { cx: 460, w: 12, len: 48 },
+  ];
+  for (const d of drips) {
+    const top = BASE_Y - 2;
+    const halfW = d.w / 2;
+    // Body — gradient from white at top to translucent icy blue at tip
+    const ig = ctx.createLinearGradient(0, top, 0, top + d.len);
+    ig.addColorStop(0, "#f8fcff");
+    ig.addColorStop(0.55, "#d9ecfb");
+    ig.addColorStop(1, "rgba(170,210,235,0.65)");
+    ctx.fillStyle = ig;
+    ctx.beginPath();
+    ctx.moveTo(d.cx - halfW, top);
+    ctx.quadraticCurveTo(d.cx - halfW * 0.6, top + d.len * 0.6, d.cx, top + d.len);
+    ctx.quadraticCurveTo(d.cx + halfW * 0.6, top + d.len * 0.6, d.cx + halfW, top);
+    ctx.closePath();
+    ctx.fill();
+    // Left-side highlight
+    ctx.strokeStyle = "rgba(255,255,255,0.8)";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(d.cx - halfW * 0.7, top + 2);
+    ctx.quadraticCurveTo(d.cx - halfW * 0.3, top + d.len * 0.55, d.cx - 0.5, top + d.len - 2);
+    ctx.stroke();
+  }
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.anisotropy = 8;
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearMipMapLinearFilter;
+  tex.needsUpdate = true;
+  _snowCapTex = tex;
+  return tex;
+}
+
 const POWERUP_STYLE: Record<PowerUpKind, { glyph: string; color: string; isEmoji: boolean }> = {
   magnet: { glyph: "🧲", color: "#ff8d8d", isEmoji: true },
   shield: { glyph: "🛡️", color: "#bfe4ff", isEmoji: true },
@@ -247,13 +366,24 @@ function syncPlatforms(
   }
 }
 
+// Snow cap geometry constants — derived to match the canvas layout of
+// getSnowCapTexture(). The cap plane is positioned so that the row in the
+// canvas marked BASE_Y (where the body ends and icicles begin) lines up with
+// local y = 0 (the brick top). With those numbers, the painted snow surface
+// peaks at local y ≈ SNOW_CAP_HEIGHT, exactly where Santa's feet rest.
+const CAP_PLANE_H = 1.6;
+const CAP_CENTER_Y = 0.262;          // see derivation in commit notes
+const CAP_TILE_WORLD_W = 10;          // one canvas tile = 10 world units
+const CAP_OVERHANG = 0.18;            // overhangs brick edge slightly
+
 function buildPlatformMesh(p: Platform, textures: THREE.Texture[]): THREE.Group {
   const g = new THREE.Group();
   // Group is anchored at the brick TOP (y = p.topY in world).
-  // The asset itself already includes the natural snow cap at the top, so
-  // we render a single tall body that includes the snow region rather than
-  // pasting a separate white block on top (which hid the asset's nicer snow
-  // and made the cap look like "a great big chunk of white").
+  // We render the brick FAÇADE only (clipping out the small painted snow
+  // that's at the top of each rooftop sprite) and then paint a separate
+  // procedural snow cap on top of it. This gives the rooftops the
+  // characterful fluffy snow + drooping icicle look from the iOS game
+  // instead of looking like flat brick walls.
 
   const srcTex = textures[p.variant % textures.length];
   const tex = srcTex.clone();
@@ -261,27 +391,59 @@ function buildPlatformMesh(p: Platform, textures: THREE.Texture[]): THREE.Group 
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.ClampToEdgeWrapping;
 
+  // Crop the upper ~12% of the source PNG (the painted snow the sprite
+  // shipped with) so it doesn't peek out from behind our new snow cap.
+  const SOURCE_SNOW_FRAC = 0.12;
+  tex.offset.y = 0;
+  tex.repeat.y = 1 - SOURCE_SNOW_FRAC;
+
   // Pick horizontal tile count from the source aspect ratio so windows are
-  // rendered at their natural shape (~3.4× narrower than they were before).
-  const totalH = PLATFORM_HEIGHT + SNOW_CAP_HEIGHT;
+  // rendered at their natural shape.
   const img = srcTex.image as { width?: number; height?: number } | undefined;
   const aspect = img && img.width && img.height ? img.width / img.height : 102 / 640;
-  const tileWidth = Math.max(0.4, totalH * aspect);
+  const brickH = PLATFORM_HEIGHT;
+  const tileWidth = Math.max(0.4, brickH * aspect);
   const tilesX = Math.max(1, Math.round(p.width / tileWidth));
-  tex.repeat.set(tilesX, 1);
+  tex.repeat.x = tilesX;
 
   const bodyMat = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false });
   bodyMat.userData.ownsTexture = true;
   const body = new THREE.Mesh(
-    new THREE.PlaneGeometry(p.width, totalH),
+    new THREE.PlaneGeometry(p.width, brickH),
     bodyMat,
   );
-  // Top of plane sits at +SNOW_CAP_HEIGHT so Santa's foot rest (which the
-  // physics already places at p.topY + SNOW_CAP_HEIGHT) lands on the snowy
-  // top edge of the source texture.
-  body.position.y = SNOW_CAP_HEIGHT - totalH / 2;
+  // Brick top sits at local y = 0; brick extends downward by PLATFORM_HEIGHT.
+  body.position.y = -brickH / 2;
   body.position.z = 0;
   g.add(body);
+
+  // Procedural snow cap on top of the brick — overhangs the front edge
+  // with drooping icicles, fluffy humped top edge, soft blue underside.
+  const capTex = getSnowCapTexture().clone();
+  capTex.needsUpdate = true;
+  capTex.wrapS = THREE.RepeatWrapping;
+  capTex.wrapT = THREE.ClampToEdgeWrapping;
+  // Random horizontal offset per platform so adjacent rooftops don't show
+  // the same icicle pattern.
+  capTex.offset.x = (p.id * 0.137) % 1;
+  const capWidth = p.width + CAP_OVERHANG * 2;
+  capTex.repeat.set(capWidth / CAP_TILE_WORLD_W, 1);
+  const capMat = new THREE.MeshBasicMaterial({
+    map: capTex,
+    transparent: true,
+    alphaTest: 0.02,
+    toneMapped: false,
+    depthWrite: false,
+  });
+  capMat.userData.ownsTexture = true;
+  const cap = new THREE.Mesh(
+    new THREE.PlaneGeometry(capWidth, CAP_PLANE_H),
+    capMat,
+  );
+  cap.position.y = CAP_CENTER_Y;
+  cap.position.z = 0.05;
+  cap.renderOrder = 2;
+  g.add(cap);
 
   return g;
 }
