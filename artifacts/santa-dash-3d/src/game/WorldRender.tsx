@@ -299,6 +299,168 @@ function getPineTexture(): THREE.Texture {
   return tex;
 }
 
+// Festive horizontal string of bulbs hanging from a thin dark cord.
+// Painted as a single tile-able strip; the renderer animates a "twinkle"
+// on the saturated bulb pixels via a custom fragment shader (cord stays
+// flat). Tile width chosen so ~6 bulbs fit per world unit.
+const LIGHTS_TILE_W = 256;
+const LIGHTS_TILE_H = 64;
+const LIGHTS_BULBS_PER_TILE = 8;
+const LIGHTS_WORLD_TILE_WIDTH = 4; // one tile spans 4 world units
+let _lightsTex: THREE.Texture | null = null;
+function getLightsTexture(): THREE.Texture {
+  if (_lightsTex) return _lightsTex;
+  const c = document.createElement("canvas");
+  c.width = LIGHTS_TILE_W; c.height = LIGHTS_TILE_H;
+  const ctx = c.getContext("2d")!;
+  ctx.clearRect(0, 0, LIGHTS_TILE_W, LIGHTS_TILE_H);
+
+  // Cord — a slightly drooping dark line across the strip.
+  const cordY = 12;
+  const droop = 6;
+  ctx.strokeStyle = "#1a1a1a";
+  ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  ctx.moveTo(0, cordY);
+  for (let i = 1; i <= LIGHTS_BULBS_PER_TILE; i++) {
+    const segX = (i - 0.5) * (LIGHTS_TILE_W / LIGHTS_BULBS_PER_TILE);
+    ctx.quadraticCurveTo(
+      segX,
+      cordY + droop,
+      i * (LIGHTS_TILE_W / LIGHTS_BULBS_PER_TILE),
+      cordY,
+    );
+  }
+  ctx.stroke();
+
+  // Bulbs — saturated colours so the shader can identify them by
+  // chroma (max-min of RGB) and pulse only those pixels.
+  const bulbColors = ["#ff3b3b", "#ffd34d", "#46d36c", "#4cb1ff"];
+  const bulbR = 6;
+  for (let i = 0; i < LIGHTS_BULBS_PER_TILE; i++) {
+    const cx = (i + 0.5) * (LIGHTS_TILE_W / LIGHTS_BULBS_PER_TILE);
+    const cy = cordY + droop + 4;
+    // Tiny vertical wire from cord to bulb top.
+    ctx.strokeStyle = "#1a1a1a";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - bulbR - 2);
+    ctx.lineTo(cx, cy - bulbR + 1);
+    ctx.stroke();
+    // Bulb base (small dark cap).
+    ctx.fillStyle = "#222";
+    ctx.fillRect(cx - 3, cy - bulbR + 1, 6, 3);
+    // Bulb body.
+    const color = bulbColors[i % bulbColors.length];
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(cx, cy + 2, bulbR, 0, Math.PI * 2);
+    ctx.fill();
+    // Specular highlight.
+    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    ctx.beginPath();
+    ctx.arc(cx - 2, cy, 2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearMipMapLinearFilter;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  _lightsTex = tex;
+  return tex;
+}
+
+// Christmas wreath — a flat ring of pine boughs with red berries and a
+// bow at the bottom. Hung on the brick wall, no animation.
+let _wreathTex: THREE.Texture | null = null;
+function getWreathTexture(): THREE.Texture {
+  if (_wreathTex) return _wreathTex;
+  const W = 256, H = 256;
+  const c = document.createElement("canvas");
+  c.width = W; c.height = H;
+  const ctx = c.getContext("2d")!;
+  ctx.clearRect(0, 0, W, H);
+
+  const cx = W / 2, cy = H / 2;
+  const outerR = W * 0.42;
+  const innerR = W * 0.22;
+
+  // Pine bough ring — paint many small dark green leaf clusters around
+  // the ring, with a few lighter highlights for depth.
+  const ringR = (outerR + innerR) / 2;
+  const clusters = 38;
+  for (let i = 0; i < clusters; i++) {
+    const a = (i / clusters) * Math.PI * 2;
+    const r = ringR + (Math.random() - 0.5) * (outerR - innerR) * 0.4;
+    const lx = cx + Math.cos(a) * r;
+    const ly = cy + Math.sin(a) * r;
+    ctx.fillStyle = i % 5 === 0 ? "#2f7d44" : "#1f5a32";
+    ctx.beginPath();
+    ctx.arc(lx, ly, 14 + Math.random() * 4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Inner shadow to read as a ring (cuts the centre).
+  ctx.globalCompositeOperation = "destination-out";
+  ctx.beginPath();
+  ctx.arc(cx, cy, innerR, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalCompositeOperation = "source-over";
+
+  // Red berries scattered around the ring.
+  for (let i = 0; i < 14; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const r = ringR + (Math.random() - 0.5) * (outerR - innerR) * 0.3;
+    ctx.fillStyle = "#d3252a";
+    ctx.beginPath();
+    ctx.arc(cx + Math.cos(a) * r, cy + Math.sin(a) * r, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.45)";
+    ctx.beginPath();
+    ctx.arc(cx + Math.cos(a) * r - 1, cy + Math.sin(a) * r - 1, 1.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Red bow at the bottom — two loops + tails.
+  const bowY = cy + outerR - 8;
+  ctx.fillStyle = "#c41822";
+  // Loops
+  ctx.beginPath();
+  ctx.ellipse(cx - 18, bowY, 16, 10, -0.3, 0, Math.PI * 2);
+  ctx.ellipse(cx + 18, bowY, 16, 10, 0.3, 0, Math.PI * 2);
+  ctx.fill();
+  // Knot
+  ctx.fillStyle = "#9a1119";
+  ctx.beginPath();
+  ctx.ellipse(cx, bowY, 6, 8, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Tails
+  ctx.fillStyle = "#c41822";
+  ctx.beginPath();
+  ctx.moveTo(cx - 4, bowY + 4);
+  ctx.lineTo(cx - 16, bowY + 22);
+  ctx.lineTo(cx - 8, bowY + 22);
+  ctx.lineTo(cx - 1, bowY + 6);
+  ctx.closePath();
+  ctx.moveTo(cx + 4, bowY + 4);
+  ctx.lineTo(cx + 16, bowY + 22);
+  ctx.lineTo(cx + 8, bowY + 22);
+  ctx.lineTo(cx + 1, bowY + 6);
+  ctx.closePath();
+  ctx.fill();
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearMipMapLinearFilter;
+  _wreathTex = tex;
+  return tex;
+}
+
 let _smallSnowmanTex: THREE.Texture | null = null;
 function getSmallSnowmanTexture(): THREE.Texture {
   if (_smallSnowmanTex) return _smallSnowmanTex;
@@ -715,62 +877,173 @@ const BOTTOM_PAD_FRAC: Record<string, number> = {
   mincepie: 142 / 1024,  // ~0.139
 };
 
+// Fragment shader for the string-of-lights decoration. Saturated bulb
+// pixels (red/yellow/green/blue) get a per-bulb sine pulse based on
+// vUv.x and uTime; near-grayscale cord pixels are passed through
+// unchanged. Saturation is approximated by max(rgb) - min(rgb).
+const LIGHTS_FRAGMENT_SHADER = /* glsl */ `
+  uniform sampler2D map;
+  uniform float uTime;
+  uniform float uBulbsAcross;
+  varying vec2 vUv;
+  void main() {
+    vec4 c = texture2D(map, vUv);
+    float maxC = max(c.r, max(c.g, c.b));
+    float minC = min(c.r, min(c.g, c.b));
+    float chroma = maxC - minC;
+    float pulse = sin(uTime * 4.0 + vUv.x * uBulbsAcross * 6.2831);
+    float boost = 1.0 + chroma * (0.18 + 0.22 * pulse);
+    gl_FragColor = vec4(c.rgb * boost, c.a);
+  }
+`;
+const LIGHTS_VERTEX_SHADER = /* glsl */ `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
 function syncDecorations(
   decorations: Decoration[],
   group: THREE.Group,
   map: Map<number, THREE.Mesh>,
 ) {
+  const nowSec = performance.now() * 0.001;
   const seen = new Set<number>();
   for (const d of decorations) {
     seen.add(d.id);
     let m = map.get(d.id);
     if (!m) {
-      const isPine = d.kind === "pine";
-      const tex = isPine ? getPineTexture() : getSmallSnowmanTexture();
-      // Real-world heights chosen so pines feel like rooftop trees and
-      // small snowmen feel like background props. Aspect comes from the
-      // canvas size used in the texture functions.
-      const baseH = isPine ? 3.4 : 2.0;
-      const aspect = isPine ? 256 / 384 : 192 / 256;
-      const h = baseH * d.scale;
-      const w = h * aspect;
-      m = new THREE.Mesh(
-        new THREE.PlaneGeometry(w, h),
-        new THREE.MeshBasicMaterial({
-          map: tex,
-          transparent: true,
-          alphaTest: 0.04,
-          toneMapped: false,
-          depthWrite: false,
-        }),
-      );
-      m.renderOrder = 3;
+      m = buildDecorationMesh(d);
       map.set(d.id, m);
       group.add(m);
     }
     const visH = (m.geometry as THREE.PlaneGeometry).parameters.height;
     m.position.x = d.x;
-    // Plane is centered; lift so the bottom of the artwork sits on the snow.
-    m.position.y = d.y + visH / 2;
-    // Slightly negative z so they sit BEHIND the obstacle plane (z=0.6) and
-    // the snow cap (z=0.05); they remain visible because the brick body only
-    // occupies y < 0 (below the snow surface) where decorations don't overlap.
-    m.position.z = -0.05;
-    // Gentle wind sway — only pines (snowmen stand still). Phase comes from
-    // the id so adjacent trees don't sway in lockstep.
+    if (d.kind === "lights" || d.kind === "wreath") {
+      // d.y is the artwork CENTER for these (lights drape under the snow
+      // cap on the wall; wreath hangs centred on the brick wall).
+      m.position.y = d.y;
+    } else {
+      // Pines / small snowmen — d.y is the bottom of the artwork (sits on
+      // snow surface), so lift the plane center up by half its height.
+      m.position.y = d.y + visH / 2;
+    }
+    // Pines and small snowmen sit ABOVE the snow cap (their bottoms are
+    // on surfaceY) so a slightly negative z keeps them BEHIND the obstacle
+    // plane (z=0.6) and snow cap (z=0.05) without being occluded — the
+    // brick body sits at y<topY where they don't overlap.
+    // Lights and wreath actually sit ON the brick wall (y at/below topY),
+    // so they must render IN FRONT of the brick (positive z) but still
+    // behind obstacles.
+    if (d.kind === "wreath") {
+      m.position.z = 0.02;
+    } else if (d.kind === "lights") {
+      m.position.z = 0.03;
+    } else {
+      m.position.z = -0.05;
+    }
     if (d.kind === "pine") {
-      const t = performance.now() * 0.0012 + d.id * 0.7;
+      // Gentle wind sway — phase comes from the id so adjacent trees
+      // don't sway in lockstep.
+      const t = nowSec * 1.2 + d.id * 0.7;
       m.rotation.z = Math.sin(t) * 0.035;
+    } else if (d.kind === "lights") {
+      // Drive the twinkle. Per-mesh phase offset so adjacent buildings
+      // pulse out of sync.
+      const mat = m.material as THREE.ShaderMaterial;
+      mat.uniforms.uTime.value = nowSec + d.id * 0.31;
     }
   }
   for (const [id, mesh] of map) {
     if (!seen.has(id)) {
       group.remove(mesh);
       mesh.geometry.dispose();
-      (mesh.material as THREE.Material).dispose();
+      const mat = mesh.material as THREE.Material;
+      // The "lights" mesh owns a per-instance CLONED texture that lives
+      // on a ShaderMaterial uniform. Material.dispose() only releases
+      // shader/program resources, not the bound texture, so dispose it
+      // explicitly to avoid leaking GPU memory as platforms are culled.
+      if (mat instanceof THREE.ShaderMaterial) {
+        const u = mat.uniforms.map;
+        if (u && u.value && (u.value as THREE.Texture).dispose) {
+          (u.value as THREE.Texture).dispose();
+        }
+      }
+      mat.dispose();
       map.delete(id);
     }
   }
+}
+
+function buildDecorationMesh(d: Decoration): THREE.Mesh {
+  if (d.kind === "lights") {
+    const w = d.w ?? 4;
+    const h = 0.55;
+    // Tile the strip horizontally so bulb spacing stays roughly constant
+    // regardless of platform width.
+    const tex = getLightsTexture().clone();
+    tex.needsUpdate = true;
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.ClampToEdgeWrapping;
+    const repeats = Math.max(1, w / LIGHTS_WORLD_TILE_WIDTH);
+    tex.repeat.set(repeats, 1);
+    const mat = new THREE.ShaderMaterial({
+      uniforms: {
+        map: { value: tex },
+        uTime: { value: 0 },
+        uBulbsAcross: { value: LIGHTS_BULBS_PER_TILE * repeats },
+      },
+      vertexShader: LIGHTS_VERTEX_SHADER,
+      fragmentShader: LIGHTS_FRAGMENT_SHADER,
+      transparent: true,
+      depthWrite: false,
+    });
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
+    mesh.renderOrder = 3;
+    return mesh;
+  }
+  if (d.kind === "wreath") {
+    const tex = getWreathTexture();
+    const baseH = 1.4;
+    const h = baseH * d.scale;
+    const w = h; // square texture
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(w, h),
+      new THREE.MeshBasicMaterial({
+        map: tex,
+        transparent: true,
+        alphaTest: 0.04,
+        toneMapped: false,
+        depthWrite: false,
+      }),
+    );
+    mesh.renderOrder = 4;
+    return mesh;
+  }
+  // pine / smallsnowman
+  const isPine = d.kind === "pine";
+  const tex = isPine ? getPineTexture() : getSmallSnowmanTexture();
+  // Real-world heights chosen so pines feel like rooftop trees and
+  // small snowmen feel like background props. Aspect comes from the
+  // canvas size used in the texture functions.
+  const baseH = isPine ? 3.4 : 2.0;
+  const aspect = isPine ? 256 / 384 : 192 / 256;
+  const h = baseH * d.scale;
+  const w = h * aspect;
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(w, h),
+    new THREE.MeshBasicMaterial({
+      map: tex,
+      transparent: true,
+      alphaTest: 0.04,
+      toneMapped: false,
+      depthWrite: false,
+    }),
+  );
+  mesh.renderOrder = 3;
+  return mesh;
 }
 
 function syncObstacles(

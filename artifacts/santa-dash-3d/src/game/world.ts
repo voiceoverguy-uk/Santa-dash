@@ -39,15 +39,23 @@ export interface Platform {
   variant: number; // which rooftop sprite
 }
 
-// Non-collidable rooftop decoration (pine trees, tiny background snowmen).
-// Spawned sparsely and rendered behind the gameplay plane.
-export type DecorationKind = "pine" | "smallsnowman";
+// Non-collidable rooftop decoration (pine trees, tiny background snowmen,
+// festive string lights and wreaths). Spawned sparsely and rendered behind
+// the gameplay plane.
+//
+// Position semantics by kind (see WorldRender.syncDecorations):
+//   - "pine" / "smallsnowman": `y` = bottom of artwork (sits on snow surface)
+//   - "lights":                `y` = vertical CENTER of the strip
+//                              `w` = world-units the strip spans
+//   - "wreath":                `y` = vertical CENTER of the wreath
+export type DecorationKind = "pine" | "smallsnowman" | "lights" | "wreath";
 export interface Decoration {
   id: number;
   kind: DecorationKind;
   x: number;
-  y: number;       // base of the decoration sits on snow surface
-  scale: number;   // size variation
+  y: number;
+  scale: number;     // size variation
+  w?: number;        // only set for "lights" — strip span in world units
 }
 
 let nextId = 1;
@@ -451,6 +459,40 @@ export class World {
         y: surfaceY,
         scale: isPine ? 0.85 + Math.random() * 0.45 : 0.7 + Math.random() * 0.2,
       });
+    }
+
+    // Festive string lights — drape across the top of wider buildings,
+    // hanging just under the snow cap on the brick wall. Center is set so
+    // the strip droops along the eaves; renderer pulses bulbs over time.
+    if (width >= 8 && Math.random() < 0.35) {
+      const span = width * (0.6 + Math.random() * 0.3);
+      this.decorations.push({
+        id: newId(),
+        kind: "lights",
+        x: platform.x + width / 2,
+        y: platform.topY - 0.25,
+        scale: 1,
+        w: span,
+      });
+    }
+
+    // Occasional Christmas wreath hung on the brick wall — sparser than
+    // pines, never near an obstacle column so it doesn't visually clash
+    // with chimneys/snowmen on top.
+    if (width >= 5 && Math.random() < 0.18) {
+      const wx = platform.x + 1.4 + Math.random() * Math.max(0.1, width - 2.8);
+      const tooClose = this.obstacles.some(
+        (o) => Math.abs(o.x - wx) < 1.5 && o.x >= platform.x && o.x <= platform.x + width,
+      );
+      if (!tooClose) {
+        this.decorations.push({
+          id: newId(),
+          kind: "wreath",
+          x: wx,
+          y: platform.topY - 1.55,
+          scale: 0.85 + Math.random() * 0.3,
+        });
+      }
     }
 
     // Occasionally spawn a power-up — rare, with min spacing
