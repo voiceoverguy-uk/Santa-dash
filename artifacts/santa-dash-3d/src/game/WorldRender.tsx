@@ -700,8 +700,10 @@ const END_CAP_INDICES = [1, 7] as const;
 const BODY_INDICES = [2] as const;
 const WINDOW_INDICES = [3, 5] as const;
 // Ensure window-bearing panels are spaced out so the rooftop doesn't read
-// as a row of windows. Minimum body panels between two window panels.
-const MIN_BODY_GAP_BETWEEN_WINDOWS = 3;
+// as a row of identical windows, but stay tight enough that each
+// "section" of brick wall feels like its own little house — matching the
+// painted row-houses in santa-dash.jpg.
+const MIN_BODY_GAP_BETWEEN_WINDOWS = 2;
 
 // Tiny deterministic PRNG so each platform's panel layout is stable across
 // re-renders but adjacent platforms differ.
@@ -744,11 +746,15 @@ function planRooftopPanels(platformId: number, width: number, brickH: number): n
   const avgSliceW = brickH * PANEL_NATURAL_ASPECT[2]; // 102/640 sprite
   const sliceCount = Math.max(2, Math.round(width / avgSliceW));
 
-  // Window count: 1 for normal/short buildings, 2 for long buildings, 3 for
-  // very long (initial runway) ones. Capped so windows stay sparse.
+  // Window count scales with building length so each ~3 brick panels of
+  // wall gets its own window — matching the row-house density of the
+  // iOS reference where every visible "section" has a lit window. Still
+  // capped so adjacent windows don't pile up.
   let targetWindows = 1;
-  if (sliceCount >= 8) targetWindows = 2;
-  if (sliceCount >= 16) targetWindows = 3;
+  if (sliceCount >= 5) targetWindows = 2;
+  if (sliceCount >= 9) targetWindows = 3;
+  if (sliceCount >= 13) targetWindows = 4;
+  if (sliceCount >= 18) targetWindows = 5;
 
   // Pick which interior slice indices will be windows. Stay away from the
   // end-caps and keep MIN_BODY_GAP_BETWEEN_WINDOWS body panels between any
@@ -1077,11 +1083,15 @@ function syncObstacles(
         visW = o.w * 2.6;
         visH = o.h * 3.0;
       } else {
-        // Chimney — render larger so it reads as a proper freestanding
-        // brick chimney rising above the snow cap (matches iOS look).
+        // Chimney — the chunkiest rooftop feature in the iOS reference,
+        // a stout red-brick box with a snow cap rising well above the
+        // snow line. Render scale combined with the bigger collision
+        // box (w=1.7, h=2.1 in world.ts) gives a chimney whose visible
+        // brick stands ~4 world units tall — about as tall as a body
+        // panel — matching the painted rooftops in santa-dash.jpg.
         tex = textures.chimneyTex;
-        visW = o.w * 3.0;
-        visH = o.h * 3.6;
+        visW = o.w * 3.2;
+        visH = o.h * 3.4;
       }
       m = new THREE.Mesh(
         new THREE.PlaneGeometry(visW, visH),

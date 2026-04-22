@@ -407,7 +407,11 @@ export class World {
       let kind: ObstacleKind;
       let w: number, h: number;
       if (r < 0.32) {
-        kind = "chimney"; w = 1.3; h = 1.7;
+        // Chimneys are the most distinctive rooftop feature in the iOS
+        // reference — chunky red-brick boxes with snow caps that rise
+        // well above the snow surface. Sized larger than the other
+        // obstacles so they read as proper architecture.
+        kind = "chimney"; w = 1.7; h = 2.1;
       } else if (r < 0.6) {
         kind = "snowman"; w = 1.2; h = 1.55;
       } else if (r < 0.82) {

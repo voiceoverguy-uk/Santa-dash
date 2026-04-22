@@ -1,0 +1,77 @@
+The current rooftop system is still visually wrong.
+
+Do NOT generate buildings using generic rectangles, repeated brick textures, white roof slabs, stamped-on windows, or procedural wall art.
+
+The original Santa Dash buildings are not generic platforms. They are assembled from the original rooftop PNG modules in the “Santa Roof tops” folder.
+
+NEW APPROACH REQUIRED
+
+1. Treat each PNG in “Santa Roof tops” as a full prefab vertical rooftop slice.
+- Use the actual PNG images as the building art.
+- Place them side by side flush to each other.
+- Do not redraw the brickwork in code.
+- Do not create fake snow caps in code.
+- Do not add fake windows in code.
+- Windows must only come from the original PNG slices that already contain them.
+
+2. Build rooftops only by assembling these original slice PNGs.
+- Each building is made from 2 to 10 full slices.
+- Each building must include at least 1 window slice.
+- Heights should vary almost every building.
+- Some buildings should be slightly stepped / raised like the original.
+- Buildings must look like joined rooftop chunks, not one long clean slab.
+
+3. Roof collision can remain simple and flat per building, but the VISUALS must come from the source PNG modules only.
+
+4. Use “Santa Dash Other WorkParts” only for separate top-of-roof items:
+- chimney.png
+- snowman.png
+- ice.png
+- presents.png
+
+These must sit on top of the assembled roof, not be baked into the wall art.
+
+5. Remove anything visually invented that was not in the original build style:
+- no generic white roof bars
+- no repeated brick wallpaper fills
+- no trees placed on roofs unless they are intentional decorative gameplay objects
+- no fake window placement
+- no overly long flat buildings with identical repeated wall art
+
+6. Create a prefab system first, then randomise level generation from prefabs.
+
+Required prefab types:
+- small rooftop: 2–3 slices
+- medium rooftop: 4–5 slices
+- long rooftop: 6–8 slices
+- raised rooftop variant: one section visually taller / stepped
+- lower rooftop variant
+- obstacle-ready rooftop variant with clear top placement space
+
+7. Then generate the level by chaining these prefabs:
+- 15–20 rooftop segments ahead
+- varied heights
+- varied widths
+- mixed easy and tricky gaps
+- many rooftops contain 1 item
+- longer rooftops may contain 2 non-overlapping items
+
+8. Chimney behaviour:
+- side collision = stumble
+- landing on top while airborne = bounce upward
+- add a code-based smoke particle effect if no smoke asset exists
+
+9. Very important visual target:
+Match the silhouette and feel of the original Santa Dash screenshots.
+The result should look like modular rooftop buildings assembled from original art, not a modern generic platformer.
+
+10. Debug requirement:
+Add a temporary debug toggle that outlines each rooftop prefab boundary and labels which source PNG slices were used. This is essential so we can verify the generator is using the real modules rather than fake generated walls.
+
+SUCCESS LOOKS LIKE:
+- buildings visually resemble the original Santa Dash rooftops
+- rooftops are clearly assembled from original PNG slices
+- no generic brick rectangles or white slab roofs remain
+- each building feels like a believable rooftop chunk
+- obstacles sit cleanly on top
+- the skyline feels varied and alive like the original
