@@ -160,9 +160,9 @@ function Loop({ world }: { world: React.MutableRefObject<World> }) {
         endPlayedRef.current = false;
       } else if (!endPlayedRef.current) {
         endPlayedRef.current = true;
-        // Endgame voice fires AFTER a 3-second pause so the player has a
-        // beat to register the death before the game-over taunt plays.
-        playSoundDelayed("end", 3000);
+        // Endgame voice fires together with the Game Over panel — the
+        // store promotes "dying" → "dead" after 1.5s, so match that here.
+        playSoundDelayed("end", 1500);
       }
       return;
     }
