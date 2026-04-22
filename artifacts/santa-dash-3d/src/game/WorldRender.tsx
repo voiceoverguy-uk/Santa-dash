@@ -250,49 +250,37 @@ function syncPlatforms(
 function buildPlatformMesh(p: Platform, textures: THREE.Texture[]): THREE.Group {
   const g = new THREE.Group();
   // Group is anchored at the brick TOP (y = p.topY in world).
-  // Brick body extends downward from there.
+  // The asset itself already includes the natural snow cap at the top, so
+  // we render a single tall body that includes the snow region rather than
+  // pasting a separate white block on top (which hid the asset's nicer snow
+  // and made the cap look like "a great big chunk of white").
 
-  const tex = textures[p.variant % textures.length].clone();
+  const srcTex = textures[p.variant % textures.length];
+  const tex = srcTex.clone();
   tex.needsUpdate = true;
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.ClampToEdgeWrapping;
-  // Use a tighter horizontal repeat so the windows in the brick texture
-  // appear at their natural aspect ratio rather than being stretched wide.
-  // Each tile of the brick texture spans ~2.4 world units horizontally.
-  const tilesX = Math.max(2, Math.round(p.width / 2.4));
+
+  // Pick horizontal tile count from the source aspect ratio so windows are
+  // rendered at their natural shape (~3.4× narrower than they were before).
+  const totalH = PLATFORM_HEIGHT + SNOW_CAP_HEIGHT;
+  const img = srcTex.image as { width?: number; height?: number } | undefined;
+  const aspect = img && img.width && img.height ? img.width / img.height : 102 / 640;
+  const tileWidth = Math.max(0.4, totalH * aspect);
+  const tilesX = Math.max(1, Math.round(p.width / tileWidth));
   tex.repeat.set(tilesX, 1);
 
-  // Brick body — sits below the brick top
   const bodyMat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.95, metalness: 0 });
   bodyMat.userData.ownsTexture = true;
   const body = new THREE.Mesh(
-    new THREE.BoxGeometry(p.width, PLATFORM_HEIGHT, 2.4),
+    new THREE.BoxGeometry(p.width, totalH, 2.4),
     bodyMat,
   );
-  body.position.y = -PLATFORM_HEIGHT / 2;
+  // Top of body sits at +SNOW_CAP_HEIGHT so Santa's foot rest (which the
+  // physics already places at p.topY + SNOW_CAP_HEIGHT) lands on the snowy
+  // top edge of the source texture.
+  body.position.y = SNOW_CAP_HEIGHT - totalH / 2;
   g.add(body);
-
-  // Snow cap — sits ABOVE the brick top
-  const snowMat = new THREE.MeshStandardMaterial({
-    color: "#f8fcff",
-    roughness: 0.85,
-    emissive: "#cfe1ff",
-    emissiveIntensity: 0.05,
-  });
-  const snow = new THREE.Mesh(
-    new THREE.BoxGeometry(p.width, SNOW_CAP_HEIGHT, 2.6),
-    snowMat,
-  );
-  snow.position.y = SNOW_CAP_HEIGHT / 2;
-  g.add(snow);
-
-  // Slightly drooping snow lip on the front edge for charm
-  const lip = new THREE.Mesh(
-    new THREE.BoxGeometry(p.width, 0.12, 0.18),
-    snowMat,
-  );
-  lip.position.set(0, -0.02, 1.32);
-  g.add(lip);
 
   return g;
 }

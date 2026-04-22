@@ -12,6 +12,10 @@ export const SANTA_FALL: string[] = Array.from({ length: 6 }, (_, i) =>
   `${BASE}sprites/santa/fall${pad(i + 1)}.png`,
 );
 
+export const SANTA_IDLE: string[] = Array.from({ length: 15 }, (_, i) =>
+  `${BASE}sprites/santa/idle${pad(i + 1)}.png`,
+);
+
 export const SANTA_HIT: string[] = Array.from({ length: 23 }, (_, i) =>
   `${BASE}sprites/santa/hit${pad(i + 1)}.png`,
 );
@@ -40,6 +44,7 @@ export const BG = {
 export const ALL_PRELOAD_TEXTURES: string[] = [
   ...SANTA_RUN,
   ...SANTA_FALL,
+  ...SANTA_IDLE,
   ...SANTA_HIT.slice(0, 12),
   ...SANTA_HIT_ICE.slice(0, 12),
   ...ROOFTOPS,
