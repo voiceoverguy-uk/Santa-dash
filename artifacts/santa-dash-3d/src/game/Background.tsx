@@ -36,7 +36,12 @@ export function Background({ world }: Props) {
     const t = snowTex.clone();
     t.needsUpdate = true;
     t.colorSpace = THREE.SRGBColorSpace;
-    t.wrapS = THREE.RepeatWrapping;
+    // Mirror the panorama at the wrap point so the painted left edge
+    // (mountain) and right edge (waterfall/rocks) never butt up against each
+    // other and produce a visible seam. Mirroring flips the painting
+    // horizontally each repeat, which keeps the horizon and snowy ground
+    // continuous across the boundary.
+    t.wrapS = THREE.MirroredRepeatWrapping;
     t.wrapT = THREE.ClampToEdgeWrapping;
     t.anisotropy = 8;
     return t;
