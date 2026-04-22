@@ -20,7 +20,6 @@ export function Background({ world }: Props) {
   }, [snowTex]);
 
   const farRef = useRef<THREE.Mesh>(null);
-  const midRef = useRef<THREE.Mesh>(null);
 
   useFrame(() => {
     const w = world.current;
@@ -33,32 +32,17 @@ export function Background({ world }: Props) {
       }
       farRef.current.position.x = w.santaX;
     }
-    if (midRef.current) {
-      const m = midRef.current.material as THREE.MeshBasicMaterial;
-      if (m.map) {
-        m.map.offset.x = (w.santaX * 0.04) % 1;
-      }
-      midRef.current.position.x = w.santaX;
-    }
   });
 
-  // Far backdrop — wide painted snowy mountain scene that tiles
+  // Single snowy mountain backdrop — we used to render a second tighter-tiled
+  // copy in front for "depth", but because it's the same source image it just
+  // looked like a doubled scene. One layer reads cleaner.
   const farTex = useMemo(() => {
     const t = snowTex.clone();
     t.needsUpdate = true;
     t.wrapS = THREE.RepeatWrapping;
     t.wrapT = THREE.ClampToEdgeWrapping;
     t.repeat.set(2, 1);
-    return t;
-  }, [snowTex]);
-
-  // Mid backdrop — same image but tiled tighter & darker for depth
-  const midTex = useMemo(() => {
-    const t = snowTex.clone();
-    t.needsUpdate = true;
-    t.wrapS = THREE.RepeatWrapping;
-    t.wrapT = THREE.ClampToEdgeWrapping;
-    t.repeat.set(3, 1);
     return t;
   }, [snowTex]);
 
@@ -134,35 +118,6 @@ export function Background({ world }: Props) {
         />
       </mesh>
 
-      {/* Mid silhouette — same image, tighter tile & a bit darker */}
-      <mesh ref={midRef} position={[0, 3.5, -22]}>
-        <planeGeometry args={[100, 14]} />
-        <shaderMaterial
-          attach="material"
-          transparent
-          args={[{
-            uniforms: { map: { value: midTex }, tint: { value: new THREE.Color("#5a6a90") } },
-            vertexShader: `
-              varying vec2 vUv;
-              void main() {
-                vUv = uv;
-                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-              }
-            `,
-            fragmentShader: `
-              uniform sampler2D map;
-              uniform vec3 tint;
-              varying vec2 vUv;
-              void main() {
-                vec4 tex = texture2D(map, vUv);
-                float topFade = smoothstep(1.0, 0.55, vUv.y);
-                vec3 col = mix(tex.rgb, tex.rgb * tint, 0.55);
-                gl_FragColor = vec4(col, tex.a * 0.7 * topFade);
-              }
-            `,
-          }]}
-        />
-      </mesh>
     </>
   );
 }

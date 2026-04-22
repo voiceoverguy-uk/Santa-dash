@@ -59,10 +59,10 @@ const JUMP_HOLD_MAX_DURATION = 0.32;   // seconds of extra force on hold
 const JUMP_RELEASE_VY_CUT = 0.45;      // velocity multiplier when jump is released early
 
 export const POWERUP_DURATION: Record<PowerUpKind, number> = {
-  magnet: 7,
+  magnet: 5,
   shield: 9,
-  float: 8,
-  double: 7,
+  float: 5,
+  double: 5,
 };
 
 export interface TickEvents {
