@@ -558,7 +558,10 @@ function mulberry32(seed: number) {
 // platform width to form ONE building. Rules (matching the original Santa
 // Dash assembly):
 //   - the leftmost & rightmost slices are end-caps (sprites 1 / 7)
-//   - never two identical sprites adjacent
+//   - body fill uses ONE consistent brick variant (sprite 2) — adjacent
+//     identical body slices are intentional so the brick pattern stays
+//     seamless across slice boundaries
+//   - window slices (3/5) avoid adjacency to keep paired windows distinct
 //   - every building MUST contain at least one window slice somewhere
 //   - long buildings get a second window; otherwise a single window so the
 //     façade reads as a real house (1–2 windows), not a row of windows
