@@ -510,17 +510,31 @@ const SOURCE_SNOW_FRAC = 0.12;
 
 // Source-PNG aspect ratios. Sprites 1 and 7 are the wider end-cap variants
 // (124×640), the rest are 102×640. Indexed 1..7 to match filenames.
+//
+// We crop the top SOURCE_SNOW_FRAC of every sprite (the painted snow that
+// shipped on each PNG would otherwise peek out from behind our procedural
+// snow cap). The plane covers the *cropped* region, so the natural aspect
+// must use the visible source height, not the raw 640 px height. Without
+// this correction, brick rows and window panes are stretched ~13.6 %
+// vertically and the windows look "squashed".
+const VISIBLE_PANEL_H_PX = 640 * (1 - SOURCE_SNOW_FRAC);
 const PANEL_NATURAL_ASPECT: Record<number, number> = {
-  1: 124 / 640,
-  2: 102 / 640,
-  3: 102 / 640,
-  4: 102 / 640,
-  5: 102 / 640,
-  6: 102 / 640,
-  7: 124 / 640,
+  1: 124 / VISIBLE_PANEL_H_PX,
+  2: 102 / VISIBLE_PANEL_H_PX,
+  3: 102 / VISIBLE_PANEL_H_PX,
+  4: 102 / VISIBLE_PANEL_H_PX,
+  5: 102 / VISIBLE_PANEL_H_PX,
+  6: 102 / VISIBLE_PANEL_H_PX,
+  7: 124 / VISIBLE_PANEL_H_PX,
 };
 const END_CAP_INDICES = [1, 7] as const;
-const BODY_INDICES = [2, 4, 6] as const;
+// Sprites 2 and 6 are byte-identical "canonical" plain brick; sprite 4 is a
+// slightly different brick variant whose colour and snow cap edge don't
+// match. Mixing them produced visible vertical seams every ~0.7 world units,
+// breaking the continuous brick wall look from the iOS original — so we
+// only use sprite 2 (and its 6 twin) as the body filler. This makes each
+// building read as ONE wall with windows punched into it.
+const BODY_INDICES = [2, 6] as const;
 const WINDOW_INDICES = [3, 5] as const;
 // Ensure window-bearing panels are spaced out so the rooftop doesn't read
 // as a row of windows. Minimum body panels between two window panels.

@@ -20,6 +20,14 @@ const PANORAMA_ASPECT = 8832 / 1242;
 // the painting always exactly fills the viewport vertically.
 const BASE_PLANE_H = 1;
 const BASE_PLANE_W = PANORAMA_ASPECT;
+// Where the painted snowy ground meets the foreground props (fences,
+// snowman, rocks) in snow.jpg, expressed as a fraction of the image
+// height measured UP from the bottom edge. Anything below this line is
+// just continuous packed snow that should sit behind the brick wall (and
+// be hidden by it). Anchoring this row to world y = 0 (the brick top)
+// makes the painted ground meet the rooftop snow caps cleanly instead of
+// floating above them.
+const GROUND_LINE_FROM_BOTTOM = 0.11;
 
 export function Background({ world }: Props) {
   const snowTex = useLoader(THREE.TextureLoader, BG.snow);
@@ -64,12 +72,15 @@ export function Background({ world }: Props) {
     const planeH = visibleH + HEADROOM;
     farRef.current.scale.set(planeH, planeH, 1);
 
-    // Anchor the BOTTOM edge of the painted scene to the rooftop line
-    // (world y = 0, where brick tops sit). The painted snowy ground at the
-    // bottom of snow.jpg therefore always meets the brick tops, regardless
-    // of how high the camera rises during a jump. Only follow the camera
-    // horizontally for parallax.
-    farRef.current.position.set(camera.position.x, planeH / 2, -20);
+    // Anchor the painted GROUND LINE of the panorama (where the foreground
+    // snow meets the fences/snowman/rocks, ~11 % up from the bottom edge of
+    // snow.jpg) to world y = 0 — the rooftop brick top. The lower band of
+    // the painting hangs below y = 0 and gets hidden behind the brick wall;
+    // sky and mountains fill the rest of the viewport. Plane stays anchored
+    // in world Y regardless of camera rise during jumps; only the X follows
+    // the camera for parallax.
+    const groundOffset = GROUND_LINE_FROM_BOTTOM * planeH;
+    farRef.current.position.set(camera.position.x, planeH / 2 - groundOffset, -20);
     farUniforms.uOffset.value = w.santaX * 0.003;
   });
 
