@@ -15,6 +15,8 @@ import {
   preloadAudio,
   unlockAudio,
   resetSfxThrottles,
+  pauseMusic,
+  resumeMusic,
 } from "./audio";
 
 // Run-scoped token to invalidate any pending timers from previous runs
@@ -34,6 +36,20 @@ export function Game() {
       code === "Space" || code === "ArrowUp" || code === "KeyW";
 
     const onKeyDown = (e: KeyboardEvent) => {
+      // Pause toggle (P or Esc)
+      if (e.code === "KeyP" || e.code === "Escape") {
+        e.preventDefault();
+        if (e.repeat) return;
+        const s = store.get().status;
+        if (s === "playing") {
+          store.setStatus("paused");
+          pauseMusic();
+        } else if (s === "paused") {
+          store.setStatus("playing");
+          resumeMusic();
+        }
+        return;
+      }
       if (!isJumpKey(e.code)) return;
       e.preventDefault();
       if (e.repeat) return;
@@ -41,6 +57,12 @@ export function Game() {
       const s = store.get().status;
       if (s === "menu" || s === "dead") {
         startGame(worldRef.current);
+        return;
+      }
+      if (s === "paused") {
+        // Space / Up while paused = resume
+        store.setStatus("playing");
+        resumeMusic();
         return;
       }
       if (s === "ready") store.setStatus("playing");
@@ -67,6 +89,7 @@ export function Game() {
       return;
     }
     if (s === "dead") return; // dead → require button press
+    if (s === "paused") return; // paused → require Resume button
     if (s === "ready") store.setStatus("playing");
     if (worldRef.current.startJump()) playSound("jump");
   };

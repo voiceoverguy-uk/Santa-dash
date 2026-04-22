@@ -435,3 +435,20 @@ export function setMusicMuted(m: boolean) {
 export function isMusicMuted() {
   return musicMuted;
 }
+
+// Pause / resume music without changing the user's mute preference.
+// Used by the in-game Pause button.
+export function pauseMusic() {
+  if (!bgm) return;
+  try {
+    bgm.pause();
+  } catch {
+    /* ignore */
+  }
+  bgmStarted = false;
+}
+export function resumeMusic() {
+  if (musicMuted || !unlocked) return;
+  if (!bgm) return;
+  startMusic();
+}

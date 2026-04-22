@@ -4,6 +4,8 @@ import {
   setSfxMuted,
   isMusicMuted,
   setMusicMuted,
+  pauseMusic,
+  resumeMusic,
 } from "./audio";
 import { useEffect, useState } from "react";
 import type { PowerUpKind } from "./world";
@@ -40,6 +42,18 @@ export function HUD({ onStart, onRestart }: Props) {
     return () => clearInterval(id);
   }, [status]);
 
+  const togglePause = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const s = store.get().status;
+    if (s === "playing") {
+      store.setStatus("paused");
+      pauseMusic();
+    } else if (s === "paused") {
+      store.setStatus("playing");
+      resumeMusic();
+    }
+  };
+
   const showFlash = hitFlash > 0 && performance.now() - hitFlash < 280;
   const activePickup =
     pickupFlash && performance.now() - pickupFlash.at < 1100 ? pickupFlash : null;
@@ -50,7 +64,7 @@ export function HUD({ onStart, onRestart }: Props) {
     <>
       {showFlash && <div className="hit-flash" />}
 
-      {(status === "ready" || status === "playing") && (
+      {(status === "ready" || status === "playing" || status === "paused") && (
         <>
           <div className="hud-top">
             <div className="hud-card">
@@ -67,6 +81,16 @@ export function HUD({ onStart, onRestart }: Props) {
               ))}
             </div>
             <div className="audio-controls">
+              {(status === "playing" || status === "paused") && (
+                <button
+                  className="mute-btn"
+                  onClick={togglePause}
+                  aria-label={status === "paused" ? "Resume" : "Pause"}
+                  title={status === "paused" ? "Resume" : "Pause"}
+                >
+                  {status === "paused" ? "▶" : "⏸"}
+                </button>
+              )}
               <button
                 className="mute-btn"
                 onClick={(e) => { e.stopPropagation(); setMusicMuted(!isMusicMuted()); force((n) => n + 1); }}
@@ -119,6 +143,27 @@ export function HUD({ onStart, onRestart }: Props) {
             </div>
           )}
         </>
+      )}
+
+      {status === "paused" && (
+        <div className="overlay" onClick={(e) => e.stopPropagation()}>
+          <div className="overlay-card paused-card">
+            <h1 className="title">Paused</h1>
+            <div className="score-final">Score: <span>{score}</span></div>
+            <button className="btn-festive" onClick={togglePause}>Resume</button>
+            <button
+              className="btn-secondary"
+              onClick={(e) => {
+                e.stopPropagation();
+                resumeMusic();
+                store.setStatus("menu");
+              }}
+            >
+              Main Menu
+            </button>
+            <div className="hint-secondary">Press <strong>P</strong> or <strong>Esc</strong> to resume</div>
+          </div>
+        </div>
       )}
 
       {status === "menu" && (

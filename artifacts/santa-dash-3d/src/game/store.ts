@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { PowerUpKind } from "./world";
 import { POWERUP_DURATION } from "./world";
 
-export type GameStatus = "menu" | "ready" | "playing" | "dead";
+export type GameStatus = "menu" | "ready" | "playing" | "paused" | "dead";
 
 export interface PowerUpState {
   kind: PowerUpKind;
