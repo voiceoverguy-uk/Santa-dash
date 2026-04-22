@@ -528,13 +528,14 @@ const PANEL_NATURAL_ASPECT: Record<number, number> = {
   7: 124 / VISIBLE_PANEL_H_PX,
 };
 const END_CAP_INDICES = [1, 7] as const;
-// Sprites 2 and 6 are byte-identical "canonical" plain brick; sprite 4 is a
-// slightly different brick variant whose colour and snow cap edge don't
-// match. Mixing them produced visible vertical seams every ~0.7 world units,
-// breaking the continuous brick wall look from the iOS original — so we
-// only use sprite 2 (and its 6 twin) as the body filler. This makes each
-// building read as ONE wall with windows punched into it.
-const BODY_INDICES = [2, 6] as const;
+// Sprite 2 is the "canonical" plain brick (sprite 6 is byte-identical to it,
+// sprite 4 is a slightly different variant with a darker brick tone and a
+// different painted snow cap). Mixing variants produced visible vertical
+// seams every ~0.7 world units, breaking the continuous brick wall look from
+// the iOS original — so we use ONLY sprite 2 for body fill. Adjacent
+// identical sprites are fine here because the brick pattern continues
+// seamlessly across the boundary (it's literally the same texture twice).
+const BODY_INDICES = [2] as const;
 const WINDOW_INDICES = [3, 5] as const;
 // Ensure window-bearing panels are spaced out so the rooftop doesn't read
 // as a row of windows. Minimum body panels between two window panels.
