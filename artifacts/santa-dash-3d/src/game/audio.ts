@@ -156,29 +156,32 @@ export function preloadAudio() {
 }
 
 export function unlockAudio() {
-  if (unlocked) return;
   const c = getCtx();
   if (!c) return;
-  unlocked = true;
 
   // Resume the AudioContext inside the gesture — this is the iOS unlock.
   if (c.state === "suspended") {
     c.resume().catch(() => {});
   }
-  // Play a silent buffer through Web Audio to fully unlock on iOS.
-  try {
-    const silent = c.createBuffer(1, 1, 22050);
-    const src = c.createBufferSource();
-    src.buffer = silent;
-    src.connect(c.destination);
-    src.start(0);
-  } catch {
-    /* ignore */
+
+  if (!unlocked) {
+    unlocked = true;
+    // Play a silent buffer through Web Audio to fully unlock on iOS.
+    try {
+      const silent = c.createBuffer(1, 1, 22050);
+      const src = c.createBufferSource();
+      src.buffer = silent;
+      src.connect(c.destination);
+      src.start(0);
+    } catch {
+      /* ignore */
+    }
+    preloadAll();
   }
 
-  preloadAll();
-
   // Music is HTMLAudio — start it inside the user gesture so iOS unlocks it.
+  // Run this on every gesture so we can recover from a previously-failed
+  // start attempt (e.g. file wasn't loaded yet on the first tap).
   if (bgm) {
     try {
       bgm.muted = false;
@@ -197,7 +200,10 @@ export function startMusic() {
     if (musicMuted) return;
     const p = el.play();
     if (p && typeof p.catch === "function") {
-      p.catch(() => {
+      p.then(() => {
+        console.log("[audio] bgm playing");
+      }).catch((err) => {
+        console.warn("[audio] bgm play() rejected:", err?.name, err?.message);
         // If play failed because the audio isn't loaded yet, wait for it
         // to be ready and try again. iOS Safari needs this on slow networks.
         bgmStarted = false;
@@ -206,9 +212,12 @@ export function startMusic() {
           el.removeEventListener("canplay", onReady);
           if (!musicMuted && !bgmStarted) {
             bgmStarted = true;
-            el.play().catch(() => {
-              bgmStarted = false;
-            });
+            el.play()
+              .then(() => console.log("[audio] bgm playing (retry)"))
+              .catch((e) => {
+                console.warn("[audio] bgm retry rejected:", e?.name, e?.message);
+                bgmStarted = false;
+              });
           }
         };
         el.addEventListener("canplaythrough", onReady, { once: true });
@@ -219,6 +228,18 @@ export function startMusic() {
   tryPlay();
 }
 
+// Per-pool throttle so a single trigger can't accidentally fire dozens of
+// overlapping plays. Especially important for "end" (death sound) which
+// must be one-shot per death event.
+const POOL_THROTTLE_MS: Partial<Record<keyof typeof pools, number>> = {
+  end: 4000,
+  ready: 1500,
+  trip: 400,
+  chim: 200,
+  ice: 200,
+};
+const lastPlayedAt: Record<string, number> = {};
+
 export function playSound(key: keyof typeof pools) {
   if (sfxMuted || !unlocked) return;
   const c = ctx;
@@ -226,6 +247,15 @@ export function playSound(key: keyof typeof pools) {
   if (!c || !gain) return;
   const urls = pools[key];
   if (!urls || urls.length === 0) return;
+
+  const now = performance.now();
+  const minGap = POOL_THROTTLE_MS[key] ?? 50;
+  if (now - (lastPlayedAt[key] ?? 0) < minGap) return;
+  lastPlayedAt[key] = now;
+  if (key === "end") {
+    console.log("[audio] playSound('end') fired");
+    console.trace();
+  }
 
   let idx = Math.floor(Math.random() * urls.length);
   if (urls.length > 1 && idx === lastIndex[key]) {
@@ -249,6 +279,12 @@ export function playSound(key: keyof typeof pools) {
     if (!buf) return;
     playBuffer(c, gain, buf);
   });
+}
+
+// Reset throttles when a new game starts so previous-session timing can't
+// suppress legitimate sound effects.
+export function resetSfxThrottles() {
+  for (const k of Object.keys(lastPlayedAt)) lastPlayedAt[k] = 0;
 }
 
 function playBuffer(c: AC, gain: GainNode, buf: AudioBuffer) {

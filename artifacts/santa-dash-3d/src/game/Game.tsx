@@ -8,7 +8,7 @@ import { CameraRig } from "./CameraRig";
 import { HUD } from "./HUD";
 import { World } from "./world";
 import { store, useStore } from "./store";
-import { playSound, preloadAudio, unlockAudio } from "./audio";
+import { playSound, preloadAudio, unlockAudio, resetSfxThrottles } from "./audio";
 
 // Run-scoped token to invalidate any pending timers from previous runs
 let runToken = 0;
@@ -115,6 +115,7 @@ function startGame(world: World) {
   runToken++;
   world.reset();
   store.reset();
+  resetSfxThrottles();
   playSound("ready");
 }
 
