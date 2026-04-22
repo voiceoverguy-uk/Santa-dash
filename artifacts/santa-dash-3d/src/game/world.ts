@@ -395,12 +395,14 @@ export class World {
 
     const obstacleCount = Math.min(3, Math.floor(Math.random() * (1 + speedFactor * 3)));
     const usedSlots = new Set<number>();
+    let spawnedObstacleCount = 0;
     for (let i = 0; i < obstacleCount; i++) {
       const slot = Math.floor(Math.random() * Math.max(1, Math.floor(width / 3.5)));
       if (usedSlots.has(slot)) continue;
       usedSlots.add(slot);
       const ox = platform.x + 1.8 + slot * 3.5 + Math.random() * 1.2;
       if (ox > platform.x + width - 1.5) continue;
+      spawnedObstacleCount++;
       const r = Math.random();
       let kind: ObstacleKind;
       let w: number, h: number;
@@ -452,7 +454,11 @@ export class World {
     //     coverage exceeds ~55% of width, leave the rooftop bare so the
     //     play area reads cleanly).
     const maxDecos = Math.min(3, Math.floor(width / 6.5));
-    const obstacleCoverage = obstacleCount * 3.5;
+    // Use the count of obstacles ACTUALLY placed on the platform — the
+    // intended `obstacleCount` is an upper bound that can shrink due to
+    // duplicate slot rolls or out-of-bounds positions, and we don't want
+    // to wrongly mark a near-empty platform as crowded.
+    const obstacleCoverage = spawnedObstacleCount * 3.5;
     const crowded = obstacleCoverage > width * 0.55;
     const wantedDecos = Math.random() < 0.85
       ? 1 + Math.floor(Math.random() * 2)
