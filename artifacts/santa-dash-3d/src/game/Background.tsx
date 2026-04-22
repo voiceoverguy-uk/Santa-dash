@@ -28,9 +28,19 @@ export function Background({ world }: Props) {
     t.needsUpdate = true;
     t.wrapS = THREE.RepeatWrapping;
     t.wrapT = THREE.ClampToEdgeWrapping;
-    t.repeat.set(2, 1);
     return t;
   }, [snowTex]);
+
+  // Uniform driving the parallax slide of the backdrop. The fragment shader
+  // adds this to the sampled U coordinate so the snow drifts behind Santa.
+  const farUniforms = useMemo(
+    () => ({
+      map: { value: farTex },
+      uOffset: { value: 0 },
+      uTile: { value: 2 },
+    }),
+    [farTex],
+  );
 
   useFrame(({ camera }) => {
     const w = world.current;
@@ -42,8 +52,7 @@ export function Background({ world }: Props) {
     if (moonGlowRef.current) moonGlowRef.current.position.set(cx + 6, cy + 7, -25);
     if (moonRef.current) moonRef.current.position.set(cx + 6, cy + 7, -24);
     if (farRef.current) {
-      const m = farRef.current.material as THREE.MeshBasicMaterial;
-      if (m.map) m.map.offset.x = (w.santaX * 0.012) % 1;
+      farUniforms.uOffset.value = (w.santaX * 0.012) % 1;
       farRef.current.position.set(cx, cy + 0.5, -20);
     }
   });
@@ -97,7 +106,7 @@ export function Background({ world }: Props) {
           attach="material"
           transparent
           args={[{
-            uniforms: { map: { value: farTex } },
+            uniforms: farUniforms,
             vertexShader: `
               varying vec2 vUv;
               void main() {
@@ -107,9 +116,12 @@ export function Background({ world }: Props) {
             `,
             fragmentShader: `
               uniform sampler2D map;
+              uniform float uOffset;
+              uniform float uTile;
               varying vec2 vUv;
               void main() {
-                vec4 tex = texture2D(map, vUv);
+                vec2 uv = vec2(vUv.x * uTile + uOffset, vUv.y);
+                vec4 tex = texture2D(map, uv);
                 float topFade = smoothstep(1.0, 0.65, vUv.y);
                 gl_FragColor = vec4(tex.rgb, tex.a * topFade);
               }
