@@ -12,60 +12,113 @@ interface Props {
 const PLATFORM_HEIGHT = 4.4;
 
 // ---- Procedural power-up textures ----
+// Draws a glassy translucent blue bubble (like a Christmas ornament) with a
+// bright crescent highlight, then renders the power-up icon centred inside
+// so the player can see what's about to be collected.
 function makePowerUpTexture(
-  emoji: string,
-  bg: string,
-  glow: string,
+  glyph: string,
+  glyphColor: string,
+  isEmoji = false,
 ): THREE.Texture {
   const size = 256;
   const c = document.createElement("canvas");
   c.width = c.height = size;
   const ctx = c.getContext("2d")!;
-  // Outer glow
-  const grad = ctx.createRadialGradient(size / 2, size / 2, size * 0.18, size / 2, size / 2, size * 0.5);
-  grad.addColorStop(0, glow);
-  grad.addColorStop(0.55, glow.replace(/[\d.]+\)$/, "0.35)"));
-  grad.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = grad;
+  const cx = size / 2;
+  const cy = size / 2;
+  const R = size * 0.42;
+
+  // Outer soft halo
+  const halo = ctx.createRadialGradient(cx, cy, R * 0.85, cx, cy, R * 1.3);
+  halo.addColorStop(0, "rgba(160,210,255,0.55)");
+  halo.addColorStop(1, "rgba(160,210,255,0)");
+  ctx.fillStyle = halo;
   ctx.fillRect(0, 0, size, size);
-  // Disc
+
+  // Bubble body — translucent blue sphere with darker rim
+  ctx.save();
   ctx.beginPath();
-  ctx.arc(size / 2, size / 2, size * 0.32, 0, Math.PI * 2);
-  const disc = ctx.createRadialGradient(size / 2, size * 0.42, 4, size / 2, size / 2, size * 0.32);
-  disc.addColorStop(0, "#ffffff");
-  disc.addColorStop(0.4, bg);
-  disc.addColorStop(1, shade(bg, -0.35));
-  ctx.fillStyle = disc;
+  ctx.arc(cx, cy, R, 0, Math.PI * 2);
+  const body = ctx.createRadialGradient(
+    cx - R * 0.35, cy - R * 0.4, R * 0.1,
+    cx, cy, R,
+  );
+  body.addColorStop(0, "rgba(190,225,255,0.85)");
+  body.addColorStop(0.45, "rgba(50,110,200,0.55)");
+  body.addColorStop(0.85, "rgba(15,40,95,0.85)");
+  body.addColorStop(1, "rgba(8,20,55,0.95)");
+  ctx.fillStyle = body;
   ctx.fill();
-  ctx.lineWidth = 6;
-  ctx.strokeStyle = "rgba(255,255,255,0.85)";
-  ctx.stroke();
-  // Glyph
-  ctx.font = `${Math.floor(size * 0.45)}px 'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',serif`;
+  ctx.restore();
+
+  // Inner dark core so the glyph reads on top
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, R * 0.78, 0, Math.PI * 2);
+  const core = ctx.createRadialGradient(cx, cy, R * 0.05, cx, cy, R * 0.78);
+  core.addColorStop(0, "rgba(20,40,90,0.55)");
+  core.addColorStop(1, "rgba(8,20,55,0.0)");
+  ctx.fillStyle = core;
+  ctx.fill();
+  ctx.restore();
+
+  // Glyph (drawn before highlights so the glass shine sits on top)
+  ctx.save();
+  ctx.fillStyle = glyphColor;
+  ctx.shadowColor = "rgba(0,0,0,0.55)";
+  ctx.shadowBlur = 6;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(emoji, size / 2, size / 2 + 6);
+  if (isEmoji) {
+    ctx.font = `${Math.floor(size * 0.42)}px 'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',serif`;
+  } else {
+    ctx.font = `900 ${Math.floor(size * 0.46)}px system-ui, -apple-system, 'Segoe UI', sans-serif`;
+  }
+  ctx.fillText(glyph, cx, cy + 4);
+  ctx.restore();
+
+  // Crescent highlight (top-left)
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(cx - R * 0.32, cy - R * 0.38, R * 0.28, R * 0.18, -0.6, 0, Math.PI * 2);
+  const hi = ctx.createRadialGradient(
+    cx - R * 0.32, cy - R * 0.38, 0,
+    cx - R * 0.32, cy - R * 0.38, R * 0.3,
+  );
+  hi.addColorStop(0, "rgba(255,255,255,0.95)");
+  hi.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = hi;
+  ctx.fill();
+  ctx.restore();
+
+  // Tiny secondary highlight (bottom-right)
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx + R * 0.42, cy + R * 0.46, R * 0.07, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(255,255,255,0.6)";
+  ctx.fill();
+  ctx.restore();
+
+  // Outer glassy rim
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, 0, Math.PI * 2);
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = "rgba(180,220,255,0.6)";
+  ctx.stroke();
+  ctx.restore();
+
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 4;
   return tex;
 }
 
-function shade(hex: string, amt: number): string {
-  // hex like #rrggbb
-  const m = hex.match(/^#?([a-f0-9]{2})([a-f0-9]{2})([a-f0-9]{2})$/i);
-  if (!m) return hex;
-  const adjust = (h: string) => {
-    const v = Math.max(0, Math.min(255, Math.round(parseInt(h, 16) * (1 + amt))));
-    return v.toString(16).padStart(2, "0");
-  };
-  return `#${adjust(m[1])}${adjust(m[2])}${adjust(m[3])}`;
-}
-
-const POWERUP_STYLE: Record<PowerUpKind, { emoji: string; bg: string; glow: string }> = {
-  magnet: { emoji: "🧲", bg: "#d83b3b", glow: "rgba(255,80,80,0.9)" },
-  shield: { emoji: "🛡️", bg: "#3a8de8", glow: "rgba(120,200,255,0.9)" },
-  double: { emoji: "✨", bg: "#f2b62a", glow: "rgba(255,225,120,0.95)" },
+const POWERUP_STYLE: Record<PowerUpKind, { glyph: string; color: string; isEmoji: boolean }> = {
+  magnet: { glyph: "🧲", color: "#ff8d8d", isEmoji: true },
+  shield: { glyph: "🛡️", color: "#bfe4ff", isEmoji: true },
+  double: { glyph: "2×", color: "#ffe07a", isEmoji: false },
+  float:  { glyph: "🪶", color: "#c8f5e0", isEmoji: true },
 };
 
 export function WorldRender({ world }: Props) {
@@ -77,11 +130,12 @@ export function WorldRender({ world }: Props) {
   const mincePieTex = useLoader(THREE.TextureLoader, OBSTACLES.mincepie);
 
   const powerUpTextures = useMemo(() => {
-    return {
-      magnet: makePowerUpTexture(POWERUP_STYLE.magnet.emoji, POWERUP_STYLE.magnet.bg, POWERUP_STYLE.magnet.glow),
-      shield: makePowerUpTexture(POWERUP_STYLE.shield.emoji, POWERUP_STYLE.shield.bg, POWERUP_STYLE.shield.glow),
-      double: makePowerUpTexture(POWERUP_STYLE.double.emoji, POWERUP_STYLE.double.bg, POWERUP_STYLE.double.glow),
-    } as Record<PowerUpKind, THREE.Texture>;
+    const out = {} as Record<PowerUpKind, THREE.Texture>;
+    (Object.keys(POWERUP_STYLE) as PowerUpKind[]).forEach((k) => {
+      const s = POWERUP_STYLE[k];
+      out[k] = makePowerUpTexture(s.glyph, s.color, s.isEmoji);
+    });
+    return out;
   }, []);
 
   useMemo(() => {

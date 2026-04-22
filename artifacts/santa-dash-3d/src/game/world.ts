@@ -2,7 +2,7 @@
 
 export type ObstacleKind = "chimney" | "snowman" | "ice" | "presents";
 export type CollectibleKind = "mincepie";
-export type PowerUpKind = "magnet" | "shield" | "double";
+export type PowerUpKind = "magnet" | "shield" | "double" | "float";
 
 export interface Obstacle {
   id: number;
@@ -61,6 +61,7 @@ const JUMP_RELEASE_VY_CUT = 0.45;      // velocity multiplier when jump is relea
 export const POWERUP_DURATION: Record<PowerUpKind, number> = {
   magnet: 7,
   shield: 9,
+  float: 8,
   double: 7,
 };
 
@@ -104,7 +105,7 @@ export class World {
   slipTimer = 0;
   // Combo + power-ups
   combo = 0;
-  powerUpTimers: Record<PowerUpKind, number> = { magnet: 0, shield: 0, double: 0 };
+  powerUpTimers: Record<PowerUpKind, number> = { magnet: 0, shield: 0, double: 0, float: 0 };
   spawnedPowerUpAt = -Infinity; // x of last power-up spawn (for spacing)
 
   constructor() { this.reset(); }
@@ -129,7 +130,7 @@ export class World {
     this.jumpHoldTime = 0;
     this.slipTimer = 0;
     this.combo = 0;
-    this.powerUpTimers = { magnet: 0, shield: 0, double: 0 };
+    this.powerUpTimers = { magnet: 0, shield: 0, double: 0, float: 0 };
     this.spawnedPowerUpAt = -Infinity;
     // Initial long safe runway
     const start: Platform = {
@@ -179,7 +180,7 @@ export class World {
     let comboBroken = false;
 
     // Decay power-up timers
-    for (const k of ["magnet", "shield", "double"] as PowerUpKind[]) {
+    for (const k of ["magnet", "shield", "double", "float"] as PowerUpKind[]) {
       if (this.powerUpTimers[k] > 0) {
         this.powerUpTimers[k] = Math.max(0, this.powerUpTimers[k] - dt);
       }
@@ -204,8 +205,12 @@ export class World {
       this.jumpHoldTime += dt;
     }
 
-    // Gravity
-    this.santaVY += GRAVITY * dt;
+    // Gravity (float power-up gives Santa a much gentler descent so he can
+    // glide across gaps between rooftops)
+    const gravityScale = this.powerUpTimers.float > 0 && this.santaVY <= 0 ? 0.22 : 1;
+    this.santaVY += GRAVITY * gravityScale * dt;
+    // Cap downward velocity while floating so he never plummets
+    if (this.powerUpTimers.float > 0 && this.santaVY < -3.5) this.santaVY = -3.5;
     this.santaY += this.santaVY * dt;
 
     // Find platform under feet
@@ -226,8 +231,12 @@ export class World {
     } else {
       this.onGround = false;
       // No platform under feet — fall starts as soon as we drop a tiny bit below the
-      // last platform's surface. This guarantees gaps cannot be "skipped" by running.
-      if (!this.isFalling && this.santaY < SANTA_HALF_HEIGHT + SNOW_CAP_HEIGHT - 0.1) {
+      // last platform's surface. While Float is active, Santa drifts across gaps
+      // and only falls if he sinks well below the rooftop line.
+      const fallThreshold = this.powerUpTimers.float > 0
+        ? SANTA_HALF_HEIGHT + SNOW_CAP_HEIGHT - 2.4
+        : SANTA_HALF_HEIGHT + SNOW_CAP_HEIGHT - 0.1;
+      if (!this.isFalling && this.santaY < fallThreshold) {
         this.isFalling = true;
         fellOff = true;
         if (this.combo > 0) { this.combo = 0; comboBroken = true; }
@@ -414,7 +423,7 @@ export class World {
       platform.x - this.spawnedPowerUpAt > 22 &&
       width > 6
     ) {
-      const kinds: PowerUpKind[] = ["magnet", "shield", "double"];
+      const kinds: PowerUpKind[] = ["magnet", "shield", "double", "float"];
       const kind = kinds[Math.floor(Math.random() * kinds.length)];
       const px = platform.x + width / 2 + (Math.random() - 0.5) * (width - 4);
       const py = surfaceY + SANTA_HALF_HEIGHT + 1.6 + Math.random() * 0.8;

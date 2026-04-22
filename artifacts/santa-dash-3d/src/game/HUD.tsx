@@ -18,7 +18,8 @@ interface Props {
 const POWERUP_META: Record<PowerUpKind, { label: string; icon: string; color: string }> = {
   magnet: { label: "Magnet", icon: "🧲", color: "#ff6b6b" },
   shield: { label: "Shield", icon: "🛡️", color: "#7dd3fc" },
-  double: { label: "2× Points", icon: "✨", color: "#ffd97a" },
+  double: { label: "2× Points", icon: "2×", color: "#ffd97a" },
+  float:  { label: "Float", icon: "🪶", color: "#a7f3d0" },
 };
 
 export function HUD({ onStart, onRestart }: Props) {
@@ -174,7 +175,8 @@ export function HUD({ onStart, onRestart }: Props) {
             <div className="powerup-legend">
               <span><span className="leg-icon">🧲</span> Magnet</span>
               <span><span className="leg-icon">🛡️</span> Shield</span>
-              <span><span className="leg-icon">✨</span> 2× Points</span>
+              <span><span className="leg-icon">2×</span> Double</span>
+              <span><span className="leg-icon">🪶</span> Float</span>
             </div>
             <button className="btn-festive" onClick={(e) => { e.stopPropagation(); onStart(); }}>Start Run</button>
             <div className="menu-options">
